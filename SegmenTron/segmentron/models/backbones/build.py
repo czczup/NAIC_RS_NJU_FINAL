@@ -76,7 +76,7 @@ def get_segmentation_backbone(backbone, norm_layer=torch.nn.BatchNorm2d):
 
 
 def load_checkpoint(model, filename, map_location=None, strict=False, logger=None):
-    checkpoint = torch.load(filename, map_location=map_location)
+    checkpoint = torch.load(filename, map_location=lambda storage, loc: storage)
     # OrderedDict is a subclass of dict
     if not isinstance(checkpoint, dict):
         raise RuntimeError(f'No state_dict found in checkpoint file {filename}')

@@ -9,3 +9,4 @@ from .ibn_resnext import *
 from .ibn_res2net import *
 from .ibn_resnet import *
 from .shufflenetv2p import *
+from .ibn_shufflenetv2p import *
