@@ -68,21 +68,9 @@ class IBN_ResNet(nn.Module):
             raise NotImplementedError
         self.inplanes = int((128 if deep_stem else 64) * scale)
         super(IBN_ResNet, self).__init__()
-        if deep_stem:
-            # resnet vc
-            mid_channel = int(64 * scale)
-            self.conv1 = nn.Sequential(
-                nn.Conv2d(3, mid_channel, 3, 2, 1, bias=False),
-                norm_layer(mid_channel),
-                nn.ReLU(True),
-                nn.Conv2d(mid_channel, mid_channel, 3, 1, 1, bias=False),
-                norm_layer(mid_channel),
-                nn.ReLU(True),
-                nn.Conv2d(mid_channel, self.inplanes, 3, 1, 1, bias=False)
-            )
-        else:
-            self.conv1 = nn.Conv2d(3, self.inplanes, 7, 2, 3, bias=False)
-        self.bn1 = norm_layer(self.inplanes)
+        
+        self.conv1 = nn.Conv2d(3, self.inplanes, 7, 2, 3, bias=False)
+        self.bn1 = nn.InstanceNorm2d(self.inplanes)
         self.relu = nn.ReLU(True)
         self.maxpool = nn.MaxPool2d(3, 2, 1)
         self.layer1 = self._make_layer(block, int(64 * scale), layers[0], norm_layer=norm_layer, ibn=ibn_cfg[0])
