@@ -1,0 +1,27 @@
+DATASET:
+    NAME: "datasetAC"
+    MEAN: [0.485, 0.456, 0.406]
+    STD: [0.229, 0.224, 0.225]
+TRAIN:
+    EPOCHS: 60
+    BATCH_SIZE: 8
+    CROP_SIZE: 256
+    BASE_SIZE: 256
+    SUPERVISE_SIZE: 640
+    BACKBONE_PRETRAINED_PATH: "pretrain/resnext50_32x4d-7cdf4587.pth"
+TEST:
+    BATCH_SIZE: 4
+    TEST_MODEL_PATH: "runs/checkpoints/0003_deeplabv3p_resnext50/best_model.pth"
+    SCALES: [0.75, 1.0, 1.25]
+
+SOLVER:
+    LR: 0.04
+    OPTIMIZER: "SGD"
+    USE_FP16: True
+    AUX: True
+
+MODEL:
+    MODEL_NAME: "DeepLabV3_Plus_V2"
+    BACKBONE: "ibn_resnext50_32x4d"
+    OUTPUT_STRIDE: 8
+
