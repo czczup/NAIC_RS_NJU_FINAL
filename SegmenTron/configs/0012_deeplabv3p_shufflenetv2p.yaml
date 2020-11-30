@@ -11,7 +11,6 @@ TRAIN:
     BACKBONE_PRETRAINED_PATH: "pretrain/ShuffleNetV2+.Large.pth.tar"
 TEST:
     BATCH_SIZE: 8
-    TEST_MODEL_PATH: "runs/checkpoints/0012_deeplabv3p_shufflenetv2p/best_model.pth"
     SCALES: [0.75, 1.0, 1.25]
 
 SOLVER:

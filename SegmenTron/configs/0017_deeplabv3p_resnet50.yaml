@@ -7,16 +7,15 @@ TRAIN:
     BATCH_SIZE: 8
     CROP_SIZE: 256
     BASE_SIZE: 256
-    SUPERVISE_SsIZE: 256
+    SUPERVISE_SIZE: 256
     BACKBONE_PRETRAINED_PATH: "pretrain/resnet50-19c8e357.pth"
     MODEL_PRETRAINED_PATH: "runs/checkpoints/0001_deeplabv3p_resnet50/best_model.pth"
 TEST:
-    BATCH_SIZE: 8
-    TEST_MODEL_PATH: "runs/checkpoints/0017_deeplabv3p_resnet50/best_model.pth"
+    BATCH_SIZE: 4
     SCALES: [0.75, 1.0, 1.25]
 
 DISTILL:
-    ALPHA: 5
+    ALPHA: 2
     TEMPERATURE: 1
 
 SOLVER:

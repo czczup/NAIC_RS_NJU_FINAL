@@ -12,7 +12,6 @@ TRAIN:
     MODEL_PRETRAINED_PATH: "runs/checkpoints/0001_deeplabv3p_resnet50/best_model.pth"
 TEST:
     BATCH_SIZE: 4
-    TEST_MODEL_PATH: "runs/checkpoints/0008_deeplabv3p_resnet50/best_model.pth"
     SCALES: [0.75, 1.0, 1.25]
 
 DISTILL:

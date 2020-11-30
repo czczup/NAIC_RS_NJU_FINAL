@@ -11,7 +11,6 @@ TRAIN:
     BACKBONE_PRETRAINED_PATH: "pretrain/resnet50-19c8e357.pth"
 TEST:
     BATCH_SIZE: 4
-    TEST_MODEL_PATH: "runs/checkpoints/0005_deeplabv3p_resnet50/best_model.pth"
     SCALES: [0.75, 1.0, 1.25]
 
 SOLVER:
