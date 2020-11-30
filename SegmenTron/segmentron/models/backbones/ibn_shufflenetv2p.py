@@ -5,6 +5,10 @@ from ...config import cfg
 
 __all__ = ['ibn_shufflenetv2_plus']
 
+def get_same_pad(ksize, dilation):
+    pad = ((ksize - 1) * dilation) / 2
+    return int(pad)
+
 class SELayer(nn.Module):
 
     def __init__(self, inplanes, isTensor=True):
@@ -47,7 +51,7 @@ class HS(nn.Module):
 
 class IBN_Shufflenet(nn.Module):
 
-    def __init__(self, inp, oup, base_mid_channels, *, ksize, stride, activation, useSE, mode, ibn):
+    def __init__(self, inp, oup, base_mid_channels, *, ksize, stride, activation, useSE, mode, ibn, dilation):
         super(IBN_Shufflenet, self).__init__()
         self.stride = stride
         assert stride in [1, 2]
@@ -61,6 +65,7 @@ class IBN_Shufflenet(nn.Module):
         self.inp = inp
         self.oup = oup
         self.mode = mode
+        self.dilation = dilation
         outputs = oup - inp
         
         branch_main = [
@@ -69,7 +74,9 @@ class IBN_Shufflenet(nn.Module):
             nn.BatchNorm2d(base_mid_channels),
             None,
             # dw
-            nn.Conv2d(base_mid_channels, base_mid_channels, ksize, stride, pad, groups=base_mid_channels, bias=False),
+            nn.Conv2d(base_mid_channels, base_mid_channels, ksize, stride,
+                      pad if dilation == 1 else get_same_pad(ksize, dilation),
+                      dilation=dilation, groups=base_mid_channels, bias=False),
             nn.BatchNorm2d(base_mid_channels),
             # pw-linear
             nn.Conv2d(base_mid_channels, outputs, 1, 1, 0, bias=False),
@@ -91,7 +98,9 @@ class IBN_Shufflenet(nn.Module):
         if mode == 2:
             branch_proj = [
                 # dw
-                nn.Conv2d(inp, inp, ksize, stride, pad, groups=inp, bias=False),
+                nn.Conv2d(inp, inp, ksize, stride,
+                          pad if dilation == 1 else get_same_pad(ksize, dilation),
+                          dilation=dilation, groups=inp, bias=False),
                 nn.BatchNorm2d(inp),
                 # pw-linear
                 nn.Conv2d(inp, inp, 1, 1, 0, bias=False),
@@ -119,7 +128,7 @@ class IBN_Shufflenet(nn.Module):
 
 class IBN_Shuffle_Xception(nn.Module):
 
-    def __init__(self, inp, oup, base_mid_channels, *, stride, activation, useSE, mode, ibn):
+    def __init__(self, inp, oup, base_mid_channels, *, stride, activation, useSE, mode, ibn, dilation):
         super(IBN_Shuffle_Xception, self).__init__()
 
         assert stride in [1, 2]
@@ -132,26 +141,33 @@ class IBN_Shuffle_Xception(nn.Module):
         self.inp = inp
         self.oup = oup
         self.mode = mode
+        self.dilation = dilation
         outputs = oup - inp
 
         branch_main = [
             # dw
-            nn.Conv2d(inp, inp, 3, stride, 1, groups=inp, bias=False),
+            nn.Conv2d(inp, inp, 3, stride,
+                      1 if dilation == 1 else get_same_pad(ksize=3, dilation=dilation),
+                      dilation=dilation, groups=inp, bias=False),
             nn.BatchNorm2d(inp),
             # pw
             nn.Conv2d(inp, base_mid_channels, 1, 1, 0, bias=False),
             nn.BatchNorm2d(base_mid_channels),
             None,
             # dw
-            nn.Conv2d(base_mid_channels, base_mid_channels, 3, stride, 1, groups=base_mid_channels, bias=False),
+            nn.Conv2d(base_mid_channels, base_mid_channels, 3, stride,
+                      1 if dilation == 1 else get_same_pad(ksize=3, dilation=dilation),
+                      dilation=dilation, groups=base_mid_channels, bias=False),
             nn.BatchNorm2d(base_mid_channels),
             # pw
             nn.Conv2d(base_mid_channels, base_mid_channels, 1, 1, 0, bias=False),
             nn.BatchNorm2d(base_mid_channels),
             None,
             # dw
-            nn.Conv2d(base_mid_channels, base_mid_channels, 3, stride, 1, groups=base_mid_channels, bias=False),
-            nn.BatchNorm2d(base_mid_channels) if not ibn else nn.InstanceNorm2d(base_mid_channels),
+            nn.Conv2d(base_mid_channels, base_mid_channels, 3, stride,
+                      1 if dilation == 1 else get_same_pad(ksize=3, dilation=dilation),
+                      dilation=dilation, groups=base_mid_channels, bias=False),
+            nn.BatchNorm2d(base_mid_channels),
             # pw
             nn.Conv2d(base_mid_channels, outputs, 1, 1, 0, bias=False),
             nn.BatchNorm2d(base_mid_channels) if not ibn else nn.InstanceNorm2d(base_mid_channels),
@@ -177,7 +193,7 @@ class IBN_Shuffle_Xception(nn.Module):
         if self.mode == 2:
             branch_proj = [
                 # dw
-                nn.Conv2d(inp, inp, 3, stride, 1, groups=inp, bias=False),
+                nn.Conv2d(inp, inp, 3, stride, 1, dilation=dilation, groups=inp, bias=False),
                 nn.BatchNorm2d(inp),
                 # pw-linear
                 nn.Conv2d(inp, inp, 1, 1, 0, bias=False),
@@ -211,13 +227,15 @@ def channel_shuffle(x):
 
 
 class IBN_ShuffleNetV2_Plus(nn.Module):
-    def __init__(self, input_size=224, n_class=1000, architecture=None, model_size='Large'):
+    def __init__(self, input_size=512, n_class=1000, architecture=None, model_size='Large'):
         super(IBN_ShuffleNetV2_Plus, self).__init__()
 
         assert input_size % 32 == 0
         assert architecture is not None
 
         self.stage_repeats = [4, 4, 8, 4]
+        self.dilations = [1, 1, 2, 4]
+
         self.ibn_cfg = [True, True, True, False]
         if model_size == 'Large':
             self.stage_out_channels = [-1, 16, 68, 168, 336, 672, 1280]
@@ -241,6 +259,7 @@ class IBN_ShuffleNetV2_Plus(nn.Module):
         archIndex = 0
         for idxstage in range(len(self.stage_repeats)):
             self.features = []
+            dilation = self.dilations[idxstage]
             numrepeat = self.stage_repeats[idxstage]
             output_channel = self.stage_out_channels[idxstage+2]
 
@@ -259,16 +278,20 @@ class IBN_ShuffleNetV2_Plus(nn.Module):
                 archIndex += 1
                 if blockIndex == 0:
                     self.features.append(IBN_Shufflenet(inp, outp, base_mid_channels=outp // 2, ksize=3, stride=stride,
-                                                        activation=activation, useSE=useSE, mode=mode, ibn=self.ibn_cfg[idxstage]))
+                                                        activation=activation, useSE=useSE, mode=mode, ibn=self.ibn_cfg[idxstage],
+                                                        dilation=dilation))
                 elif blockIndex == 1:
                     self.features.append(IBN_Shufflenet(inp, outp, base_mid_channels=outp // 2, ksize=5, stride=stride,
-                                                        activation=activation, useSE=useSE, mode=mode, ibn=self.ibn_cfg[idxstage]))
+                                                        activation=activation, useSE=useSE, mode=mode, ibn=self.ibn_cfg[idxstage],
+                                                        dilation=dilation))
                 elif blockIndex == 2:
                     self.features.append(IBN_Shufflenet(inp, outp, base_mid_channels=outp // 2, ksize=7, stride=stride,
-                                                        activation=activation, useSE=useSE, mode=mode, ibn=self.ibn_cfg[idxstage]))
+                                                        activation=activation, useSE=useSE, mode=mode, ibn=self.ibn_cfg[idxstage],
+                                                        dilation=dilation))
                 elif blockIndex == 3:
                     self.features.append(IBN_Shuffle_Xception(inp, outp, base_mid_channels=outp // 2, stride=stride,
-                                                              activation=activation, useSE=useSE, mode=mode, ibn=self.ibn_cfg[idxstage]))
+                                                              activation=activation, useSE=useSE, mode=mode, ibn=self.ibn_cfg[idxstage],
+                                                              dilation=dilation))
                 else:
                     raise NotImplementedError
                 input_channel = output_channel
@@ -338,7 +361,7 @@ if __name__ == "__main__":
     architecture = [0, 0, 3, 1, 1, 1, 0, 0, 2, 0, 2, 1, 1, 0, 2, 0, 2, 1, 3, 2]
     model = IBN_ShuffleNetV2_Plus(architecture=architecture)
 
-    test_data = torch.rand(2, 3, 640, 640)
+    test_data = torch.rand(2, 3, 512, 512)
     test_outputs = model(test_data)
     for out in test_outputs:
         print(out.shape)
