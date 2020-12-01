@@ -50,8 +50,7 @@ class IBN_ResNet(nn.Module):
     
     def __init__(self, block, layers, num_classes=1000, deep_stem=False,
                  norm_layer=nn.BatchNorm2d, ibn_cfg=('b', 'b', 'b', None)):
-        self.c1_channels = 256
-        self.c4_channels = 2048
+        
         output_stride = 8
         scale = 1
         if output_stride == 32:

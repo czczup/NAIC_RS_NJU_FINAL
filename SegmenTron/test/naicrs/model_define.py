@@ -4,20 +4,24 @@ from dunet import DUNet
 from ibn_resnet import ibn_resnet50
 from ibn_resnext import ibn_b_resnext50_32x4d
 from resnext import resnext50_32x4d
-from shufflenetv2p import shufflenetv2_plus
-from ibn_shufflenetv2p import ibn_shufflenetv2_plus
+from segmentron.models.backbones.ofa_1080ti_gpu64_27ms.main import ofa_1080ti_gpu64_27ms
+from segmentron.models.backbones.tiny_ofa_1080ti_gpu64_27ms.main import tiny_ofa_1080ti_gpu64_27ms
+from segmentron.models.backbones.shufflenetv2p import shufflenetv2_plus
+from segmentron.models.backbones.ibn_shufflenetv2p import ibn_shufflenetv2_plus
 
 try:
     import apex
 except:
     print("apex is not installed successfully")
-import time
 
 
 def init_model(model_filename):
     device = torch.device("cuda")
-    model = DeepLabV3Plus(nclass=[8,14], get_backbone=ibn_resnet50)
-    
+    model = DeepLabV3Plus(nclass=[8,14], get_backbone=ofa_1080ti_gpu64_27ms, channels=[32, 1664])
+    # model = DeepLabV3Plus(nclass=[8,14], get_backbone=tiny_ofa_1080ti_gpu64_27ms, channels=[32, 416])
+    # model = DeepLabV3Plus(nclass=[8,14], get_backbone=shufflenetv2_plus, channels=[68,1280])
+    # model = DeepLabV3Plus(nclass=[8,14], get_backbone=ibn_resnet50, channels=[256, 2048])
+
     model_path = "../model/%s" % model_filename
     print('load test model from {}'.format(model_path))
     msg = model.load_state_dict(torch.load(model_path, map_location=lambda storage, loc: storage), strict=False)

@@ -72,9 +72,6 @@ class IBN_ResNext(nn.Module):
                  width_per_group=64, norm_layer=nn.BatchNorm2d, ibn_cfg=('a', 'a', 'a', None)):
         super(IBN_ResNext, self).__init__()
         
-        self.c1_channels = 256
-        self.c4_channels = 2048
-        
         if output_stride == 32:
             dilations = [1, 1]
             strides = [2, 2]

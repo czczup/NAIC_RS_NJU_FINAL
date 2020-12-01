@@ -5,16 +5,14 @@ import torch.nn.functional as F
 
 
 class DeepLabV3Plus(nn.Module):
-    def __init__(self, nclass=[8, 14], get_backbone=None):
+    def __init__(self, nclass=[8, 14], get_backbone=None, channels=None):
         super(DeepLabV3Plus, self).__init__()
         self.nclass = nclass
         self.encoder = get_backbone()
         self.norm_layer = nn.BatchNorm2d
         
-        self.head = _DeepLabHead(self.nclass[0], c1_channels=self.encoder.c1_channels
-                                 , c4_channels=self.encoder.c4_channels)
-        self.head2 = _DeepLabHead(self.nclass[1], c1_channels=self.encoder.c1_channels,
-                                  c4_channels=self.encoder.c4_channels)
+        self.head = _DeepLabHead(self.nclass[0], c1_channels=channels[0], c4_channels=channels[1])
+        self.head2 = _DeepLabHead(self.nclass[1], c1_channels=channels[0], c4_channels=channels[1])
         
         self.__setattr__('decoder', ['head', 'head2'])
     
