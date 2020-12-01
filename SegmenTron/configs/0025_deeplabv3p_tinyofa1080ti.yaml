@@ -1,0 +1,25 @@
+DATASET:
+    NAME: "datasetAC"
+    MEAN: [0.485, 0.456, 0.406]
+    STD: [0.229, 0.224, 0.225]
+TRAIN:
+    EPOCHS: 60
+    BATCH_SIZE: 16
+    CROP_SIZE: 256
+    BASE_SIZE: 256
+    SUPERVISE_SIZE: 256
+    BACKBONE_PRETRAINED_PATH: "pretrain/1080ti_gpu64_27ms.pth"
+TEST:
+    BATCH_SIZE: 8
+    SCALES: [0.75, 1.0, 1.25]
+
+SOLVER:
+    LR: 0.04
+    OPTIMIZER: "SGD"
+    AUX: True
+
+MODEL:
+    MODEL_NAME: "DeepLabV3_Plus_V2"
+    BACKBONE: "tiny_ofa_1080ti_gpu64_27ms"
+    OUTPUT_STRIDE: 8
+
