@@ -181,7 +181,10 @@ class Trainer(object):
                         self.optimizer.param_groups[0]['lr'], losses_reduced.item(),
                         str(datetime.timedelta(seconds=int(time.time() - start_time))),
                         eta_string))
-
+            
+            if epoch > epochs:
+                break
+                
             if iteration % self.iters_per_epoch == 0 and self.save_to_disk:
                 save_checkpoint(self.model, epoch, self.optimizer, self.lr_scheduler, is_best=False)
 

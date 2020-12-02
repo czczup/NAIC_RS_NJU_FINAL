@@ -146,7 +146,8 @@ class Trainer(object):
         for (images, targets_8, targets_14, logits_8, logits_14) in self.train_loader:
 
             epoch = iteration // iters_per_epoch + 1
-
+            if epoch > epochs: break
+                
             iteration += 1
             images = images.to(self.device, non_blocking=True)
             targets_8 = targets_8.to(self.device, non_blocking=True)
@@ -188,7 +189,7 @@ class Trainer(object):
                         self.optimizer.param_groups[0]['lr'], loss_dict['ce_loss'].item(), loss_dict['distill_loss'].item(),
                         str(datetime.timedelta(seconds=int(time.time() - start_time))),
                         eta_string))
-
+                
             if iteration % self.iters_per_epoch == 0 and self.save_to_disk:
                 save_checkpoint(self.model, epoch, self.optimizer, self.lr_scheduler, is_best=False)
 
