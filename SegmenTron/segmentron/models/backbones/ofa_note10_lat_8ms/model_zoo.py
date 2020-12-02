@@ -47,41 +47,38 @@ class MobileInvertedResidualBlock(MyModule):
         return MobileInvertedResidualBlock(mobile_inverted_conv, shortcut)
 
 
-class ProxylessNASNets(MyNetwork):
+class MobileNetV3(MyNetwork):
 
-    def __init__(self, first_conv, blocks, feature_mix_layer):
-        super(ProxylessNASNets, self).__init__()
+    def __init__(self, first_conv, blocks):
+        super(MobileNetV3, self).__init__()
 
         self.first_conv = first_conv
         self.blocks = nn.ModuleList(blocks)
-        self.feature_mix_layer = feature_mix_layer
 
     def forward(self, x):
         outs = list()
         x = self.first_conv(x)
         for index, block in enumerate(self.blocks):
             x = block(x)
-            if index == 2 or index == 6 or index == 12:
+            # print("*", x.shape, index)
+            if index == 2 or index == 4 or index == 9:
                 outs.append(x)
-        if self.feature_mix_layer is not None:
-            x = self.feature_mix_layer(x)
-            outs.append(x)
+        outs.append(x)
         return outs
+
 
     @staticmethod
     def build_from_config(config):
         first_conv = set_layer_from_config(config['first_conv'])
-        feature_mix_layer = set_layer_from_config(config['feature_mix_layer'])
 
         blocks = []
         for block_config in config['blocks']:
             blocks.append(MobileInvertedResidualBlock.build_from_config(block_config))
 
-        net = ProxylessNASNets(first_conv, blocks, feature_mix_layer)
+        net = MobileNetV3(first_conv, blocks)
         if 'bn' in config:
             net.set_bn_param(**config['bn'])
         else:
             net.set_bn_param(momentum=0.1, eps=1e-3)
 
         return net
-

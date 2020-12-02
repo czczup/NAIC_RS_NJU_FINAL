@@ -35,6 +35,10 @@ class DeepLabV3PlusV2(SegBaseModel):
             c1_channels = 32
             c3_channels = 128
             c4_channels = 416
+        elif self.backbone == 'ofa_note10_lat_8ms':
+            c1_channels = 24
+            c3_channels = 112
+            c4_channels = 160
         datasetA_nclass = 8
         datasetC_nclass = 14
         self.head = _DeepLabHead(datasetA_nclass, c1_channels=c1_channels, c4_channels=c4_channels)
