@@ -8,6 +8,7 @@ from segmentron.models.backbones.ofa_1080ti_gpu64_27ms.main import ofa_1080ti_gp
 from segmentron.models.backbones.tiny_ofa_1080ti_gpu64_27ms.main import tiny_ofa_1080ti_gpu64_27ms
 from segmentron.models.backbones.shufflenetv2p import shufflenetv2_plus
 from segmentron.models.backbones.ibn_shufflenetv2p import ibn_shufflenetv2_plus
+from segmentron.models.backbones.ofa_note10_lat_8ms.main import ofa_note10_lat_8ms
 
 try:
     import apex
@@ -17,10 +18,11 @@ except:
 
 def init_model(model_filename):
     device = torch.device("cuda")
-    model = DeepLabV3Plus(nclass=[8,14], get_backbone=ofa_1080ti_gpu64_27ms, channels=[32, 1664])
+    # model = DeepLabV3Plus(nclass=[8,14], get_backbone=ofa_1080ti_gpu64_27ms, channels=[32, 1664])
     # model = DeepLabV3Plus(nclass=[8,14], get_backbone=tiny_ofa_1080ti_gpu64_27ms, channels=[32, 416])
     # model = DeepLabV3Plus(nclass=[8,14], get_backbone=shufflenetv2_plus, channels=[68,1280])
     # model = DeepLabV3Plus(nclass=[8,14], get_backbone=ibn_resnet50, channels=[256, 2048])
+    model = DeepLabV3Plus(nclass=[8,14], get_backbone=ofa_note10_lat_8ms, channels=[24, 160])
 
     model_path = "../model/%s" % model_filename
     print('load test model from {}'.format(model_path))

@@ -31,11 +31,11 @@ class DeepLabV3PlusV2(SegBaseModel):
             c1_channels = 32
             c3_channels = 128
             c4_channels = 1664
-        elif self.backbone == 'tiny_ofa_1080ti_gpu64_27ms':
+        elif self.backbone == 'tiny_ofa_1080ti_gpu64_27ms' or self.backbone == 'ibn_tiny_ofa_1080ti_gpu64_27ms':
             c1_channels = 32
             c3_channels = 128
             c4_channels = 416
-        elif self.backbone == 'ofa_note10_lat_8ms':
+        elif self.backbone == 'ofa_note10_lat_8ms' or self.backbone == 'ibn_ofa_note10_lat_8ms':
             c1_channels = 24
             c3_channels = 112
             c4_channels = 160

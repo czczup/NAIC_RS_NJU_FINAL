@@ -7,7 +7,7 @@ import cv2
 import os
 import math
 
-batch_size = 4
+batch_size = 16
 device = torch.device("cuda")
 transform = transforms.Compose([
         transforms.ToTensor(),

@@ -7,7 +7,7 @@ from segmentron.models.backbones import BACKBONE_REGISTRY
 import torch.nn as nn
 import os
 
-__all__ = ['tiny_ofa_1080ti_gpu64_27ms']
+__all__ = ['tiny_ofa_1080ti_gpu64_27ms', 'ibn_tiny_ofa_1080ti_gpu64_27ms']
 
 
 @BACKBONE_REGISTRY.register()
@@ -15,6 +15,10 @@ def tiny_ofa_1080ti_gpu64_27ms(norm_layer=nn.BatchNorm2d):
     net_config = json.load(open(os.path.join(os.path.dirname(__file__), 'net.config'), 'r'))
     return ProxylessNASNets.build_from_config(net_config)
 
+@BACKBONE_REGISTRY.register()
+def ibn_tiny_ofa_1080ti_gpu64_27ms(norm_layer=nn.BatchNorm2d):
+    net_config = json.load(open(os.path.join(os.path.dirname(__file__), 'net.config'), 'r'))
+    return ProxylessNASNets.build_from_config(net_config, ibn=True)
 
 if __name__ == '__main__':
     

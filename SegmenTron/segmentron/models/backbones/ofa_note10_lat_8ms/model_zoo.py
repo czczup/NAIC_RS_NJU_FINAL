@@ -9,13 +9,18 @@ from .utils import MyNetwork
 
 
 class MobileInvertedResidualBlock(MyModule):
-
-    def __init__(self, mobile_inverted_conv, shortcut):
+    
+    def __init__(self, mobile_inverted_conv, shortcut, ibn=False):
         super(MobileInvertedResidualBlock, self).__init__()
-
+        
         self.mobile_inverted_conv = mobile_inverted_conv
         self.shortcut = shortcut
-
+        
+        if ibn and self.mobile_inverted_conv.config['out_channels'] <= 80:
+            self.IN = nn.InstanceNorm2d(self.mobile_inverted_conv.config['out_channels'])
+        else:
+            self.IN = None
+            
     def forward(self, x):
         if self.mobile_inverted_conv is None or isinstance(self.mobile_inverted_conv, ZeroLayer):
             res = x
@@ -23,6 +28,8 @@ class MobileInvertedResidualBlock(MyModule):
             res = self.mobile_inverted_conv(x)
         else:
             res = self.mobile_inverted_conv(x) + self.shortcut(x)
+        if self.IN is not None:
+            res = self.IN(res)
         return res
 
     @property
@@ -41,10 +48,10 @@ class MobileInvertedResidualBlock(MyModule):
         }
 
     @staticmethod
-    def build_from_config(config):
+    def build_from_config(config, ibn=False):
         mobile_inverted_conv = set_layer_from_config(config['mobile_inverted_conv'])
         shortcut = set_layer_from_config(config['shortcut'])
-        return MobileInvertedResidualBlock(mobile_inverted_conv, shortcut)
+        return MobileInvertedResidualBlock(mobile_inverted_conv, shortcut, ibn=ibn)
 
 
 class MobileNetV3(MyNetwork):
@@ -68,12 +75,12 @@ class MobileNetV3(MyNetwork):
 
 
     @staticmethod
-    def build_from_config(config):
+    def build_from_config(config, ibn=False):
         first_conv = set_layer_from_config(config['first_conv'])
 
         blocks = []
         for block_config in config['blocks']:
-            blocks.append(MobileInvertedResidualBlock.build_from_config(block_config))
+            blocks.append(MobileInvertedResidualBlock.build_from_config(block_config, ibn=ibn))
 
         net = MobileNetV3(first_conv, blocks)
         if 'bn' in config:
