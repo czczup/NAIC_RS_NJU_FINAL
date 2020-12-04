@@ -22,15 +22,6 @@ class DeepLabV3Plus(SegBaseModel):
         if self.backbone.startswith('mobilenet'):
             c1_channels = 24
             c4_channels = 320
-        elif cfg.SOLVER.NAS_FPN == True:
-            nas_fpn_out = 384
-            c1_channels = nas_fpn_out
-            c3_channels = nas_fpn_out
-            c4_channels = nas_fpn_out
-            from .backbones.mmseg.nas_fpn import NASFPN
-            self.nas_fpn = NASFPN(in_channels=[64, 256, 512, 1024, 2048],
-                                  out_channels=nas_fpn_out, num_outs=5, stack_times=3,
-                                  norm_cfg=dict(type='BN', requires_grad=True))
         else:
             c1_channels = 256
             c3_channels = 1024

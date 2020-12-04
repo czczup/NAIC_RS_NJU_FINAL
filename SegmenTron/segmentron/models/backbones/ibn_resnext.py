@@ -172,3 +172,9 @@ class IBN_ResNext(nn.Module):
 def ibn_resnext50_32x4d(norm_layer=nn.BatchNorm2d):
     return IBN_ResNext(Bottleneck, [3, 4, 6, 3], groups=32,
                    width_per_group=4, norm_layer=norm_layer, ibn_cfg=('b', 'b', 'b', None))
+
+
+@BACKBONE_REGISTRY.register()
+def ibn_resnext101_32x8d(norm_layer=nn.BatchNorm2d):
+    return IBN_ResNext(Bottleneck, [3, 4, 23, 3], groups=32,
+                   width_per_group=8, norm_layer=norm_layer, ibn_cfg=('b', 'b', None, None))

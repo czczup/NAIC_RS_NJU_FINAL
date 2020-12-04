@@ -29,9 +29,9 @@ class DUNetV2(SegBaseModel):
 
         if self.aux:
             self.auxlayer = _FCNHead(1024, 256, norm_layer=self.norm_layer)
-            self.aux_dupsample = DUpsampling(256, 8, scale_factor=8)
+            self.aux_dupsample = DUpsampling(256, 8, scale_factor=2)
             self.auxlayer2 = _FCNHead(1024, 256, norm_layer=self.norm_layer)
-            self.aux_dupsample2 = DUpsampling(256, 14, scale_factor=8)
+            self.aux_dupsample2 = DUpsampling(256, 14, scale_factor=2)
         
         self.supervise_size = int(cfg.TRAIN.SUPERVISE_SIZE)
 
@@ -57,9 +57,11 @@ class DUNetV2(SegBaseModel):
         if self.aux and self.training:
             auxout1 = self.auxlayer(c3)
             auxout1 = self.aux_dupsample(auxout1)
-            
+            auxout1 = F.interpolate(auxout1, size, mode='bilinear', align_corners=True)
+
             auxout2 = self.auxlayer2(c3)
             auxout2 = self.aux_dupsample2(auxout2)
+            auxout2 = F.interpolate(auxout2, size, mode='bilinear', align_corners=True)
 
             outputs1.append(auxout1)
             outputs2.append(auxout2)

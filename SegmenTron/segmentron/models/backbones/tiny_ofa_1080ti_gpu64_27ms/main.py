@@ -30,8 +30,6 @@ if __name__ == '__main__':
     device = torch.device("cuda")
     dummy_input = torch.randn([1, 3, 256, 256]).to(device)
     net = net.to(device)
-    # init = torch.load('ofa_1080ti_gpu64_27ms.pth')['state_dict']
-    # net.load_state_dict(init, strict=False)
     outs = net(dummy_input)
     for out in outs:
         print(out.shape)
