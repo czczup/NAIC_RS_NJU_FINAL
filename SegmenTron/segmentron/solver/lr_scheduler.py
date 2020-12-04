@@ -30,6 +30,7 @@ class WarmupPolyLR(torch.optim.lr_scheduler._LRScheduler):
     def get_lr(self):
         N = self.max_iters - self.warmup_iters
         T = self.last_epoch - self.warmup_iters
+
         if self.last_epoch < self.warmup_iters:
             if self.warmup_method == 'constant':
                 warmup_factor = self.warmup_factor
@@ -43,6 +44,48 @@ class WarmupPolyLR(torch.optim.lr_scheduler._LRScheduler):
         return [self.target_lr + (base_lr - self.target_lr) * factor for base_lr in self.base_lrs]
 
 
+class WarmupCyclePolyLR(torch.optim.lr_scheduler._LRScheduler):
+    def __init__(self, optimizer, target_lr=0, max_iters=0, power=0.9, warmup_factor=1.0 / 3,
+                 warmup_iters=500, warmup_method='linear', last_epoch=-1):
+        if warmup_method not in ("constant", "linear"):
+            raise ValueError(
+                "Only 'constant' or 'linear' warmup_method accepted "
+                "got {}".format(warmup_method))
+
+        self.target_lr = target_lr
+        self.max_iters = max_iters
+        self.power = power
+        self.warmup_factor = warmup_factor
+        self.warmup_iters = warmup_iters
+        self.warmup_method = warmup_method
+
+        super(WarmupCyclePolyLR, self).__init__(optimizer, last_epoch)
+
+    def get_lr(self):
+        N = self.max_iters - self.warmup_iters
+        T = self.last_epoch - self.warmup_iters
+        
+        if self.last_epoch < self.warmup_iters:
+            if self.warmup_method == 'constant':
+                warmup_factor = self.warmup_factor
+            elif self.warmup_method == 'linear':
+                alpha = float(self.last_epoch) / self.warmup_iters
+                warmup_factor = self.warmup_factor * (1 - alpha) + alpha
+            else:
+                raise ValueError("Unknown warmup type.")
+            return [self.target_lr + (base_lr - self.target_lr) * warmup_factor for base_lr in self.base_lrs]
+        
+        if self.last_epoch < self.max_iters // 2:
+            factor = pow(1 - T / (N/2), self.power)
+            return [self.target_lr + (base_lr - self.target_lr) * factor for base_lr in self.base_lrs]
+        else:
+            tempN = N // 2 // 3
+            tempT = T % tempN
+            factor = pow(1 - tempT / tempN, self.power)
+            tempF = 0.5 ** ((T-N//2)//tempN+1)
+            return [self.target_lr + (base_lr - self.target_lr) * factor * tempF for base_lr in self.base_lrs]
+
+        
 class WarmupConstantLR(torch.optim.lr_scheduler._LRScheduler):
     def __init__(self, optimizer, target_lr=0, max_iters=0, power=0.9, warmup_factor=1.0 / 3,
                  warmup_iters=500, warmup_method='linear', last_epoch=-1):
@@ -138,7 +181,7 @@ class WarmupCosineLR(torch.optim.lr_scheduler._LRScheduler):
             base_lr
             * warmup_factor
             * 0.5
-            * (1.0 + math.cos(math.pi * (self.last_epoch % 10)/10 ))
+            * (1.0 + math.cos(math.pi * self.last_epoch / self.max_iters))
             for base_lr in self.base_lrs
         ]
 
@@ -181,6 +224,10 @@ def get_scheduler(optimizer, max_iters, iters_per_epoch):
     warm_up_iters = iters_per_epoch * cfg.SOLVER.WARMUP.EPOCHS
     if mode == 'poly':
         return WarmupPolyLR(optimizer, max_iters=max_iters, power=cfg.SOLVER.POLY.POWER,
+                            warmup_factor=cfg.SOLVER.WARMUP.FACTOR, warmup_iters=warm_up_iters,
+                            warmup_method=cfg.SOLVER.WARMUP.METHOD)
+    elif mode == 'cycle':
+        return WarmupCyclePolyLR(optimizer, max_iters=max_iters, power=cfg.SOLVER.POLY.POWER,
                             warmup_factor=cfg.SOLVER.WARMUP.FACTOR, warmup_iters=warm_up_iters,
                             warmup_method=cfg.SOLVER.WARMUP.METHOD)
     elif mode == 'constant':
