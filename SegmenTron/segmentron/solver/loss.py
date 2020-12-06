@@ -180,6 +180,100 @@ class MixDistillLossAndCrossEntropyLoss(nn.CrossEntropyLoss):
         distill_loss = distill_loss_8 * 0.5 + distill_loss_14 * 0.5
         return dict(ce_loss=ce_loss, distill_loss=distill_loss * self.alpha)
 
+
+class MixDistillLossAndCrossEntropyLossV2(nn.CrossEntropyLoss):
+    def __init__(self, aux=True, aux_weight=0.2, ignore_index=-1, **kwargs):
+        super(MixDistillLossAndCrossEntropyLossV2, self).__init__(ignore_index=ignore_index)
+        self.aux = aux
+        self.aux_weight = aux_weight
+        self.ignore_index = ignore_index
+        self.alpha = cfg.DISTILL.ALPHA
+        self.beta = cfg.DISTILL.BETA
+        self.temperature = cfg.DISTILL.TEMPERATURE
+        self.scale = cfg.DISTILL.SCALE
+        logging.info("alpha: %d, beta: %f, scale: %f, temperature: %d"
+                     % (self.alpha, self.beta, self.scale, self.temperature))
+    
+    def _aux_forward(self, preds, target):
+        loss = F.cross_entropy(preds[0], target, weight=None, ignore_index=self.ignore_index)
+        for i in range(1, len(preds)):
+            aux_loss = F.cross_entropy(preds[i], target, weight=None, ignore_index=self.ignore_index)
+            loss += self.aux_weight * aux_loss
+        return loss
+    
+    # def pixel_wise_loss(self, pred_s, pred_t):
+    #     B, C, W, H = pred_s.shape
+    #     soft_log_out = F.log_softmax(pred_s / self.temperature, dim=1)
+    #     soft_t = pred_t / self.temperature
+    #     loss_kd = F.kl_div(soft_log_out, soft_t.detach(), reduction="none")
+    #     loss_kd = loss_kd.sum(dim=1)
+    #     loss_kd = loss_kd.view(B, W * H)
+    #     loss = loss_kd.sum(1) / loss_kd.size(1)
+    #     loss = loss.mean()
+    #     return loss
+    
+    def pixel_wise_loss(self, pred_s, pred_t, masked_indices, eps=1E-6):
+        B, C, W, H = pred_s.shape
+        masked_indices = masked_indices.view(B, -1)  # [8, 640*640]
+        soft_log_out = F.log_softmax(pred_s / self.temperature, dim=1)
+        soft_t = F.softmax(pred_t / self.temperature, dim=1)
+        loss_kd = F.kl_div(soft_log_out, soft_t.detach(), reduction="none")  # [8, 8, 640, 640]
+        loss_kd = loss_kd.sum(dim=1)  # [8, 640, 640]
+        loss_kd = loss_kd.view(B, W * H)  # [8, 640*640]
+        loss_kd.masked_fill_(masked_indices, 0)  # [8, 640*640]
+        loss = loss_kd.sum(1) / (loss_kd.size(1) - masked_indices.sum(1) + eps)
+        loss = loss.mean()
+        return loss
+    
+    def _pi_forward(self, preds_s, preds_t, targets):
+        assert preds_s[0].shape == preds_t[0].shape, 'the output dim of teacher and student differ'
+        masked_indices = targets.eq(self.ignore_index)
+        loss = self.pixel_wise_loss(preds_s[0], preds_t[0], masked_indices)
+        for i in range(1, len(preds_s)):
+            aux_loss = self.pixel_wise_loss(preds_s[i], preds_t[0], masked_indices)
+            loss += self.aux_weight * aux_loss
+        return loss
+
+    def L2(self, f_):
+        return (((f_ ** 2).sum(dim=1)) ** 0.5).reshape(f_.shape[0], 1, f_.shape[2], f_.shape[3]) + 1e-8
+
+    def similarity(self, feat):
+        feat = feat.float()
+        tmp = self.L2(feat).detach()
+        feat = feat / tmp
+        feat = feat.reshape(feat.shape[0], feat.shape[1], -1)
+        return torch.einsum('icm,icn->imn', [feat, feat])
+
+    def sim_dis_compute(self, f_S, f_T):
+        sim_err = ((self.similarity(f_T) - self.similarity(f_S)) ** 2) / ((f_T.shape[-1] * f_T.shape[-2]) ** 2) / f_T.shape[0]
+        sim_dis = sim_err.sum()
+        return sim_dis
+
+    def _pa_forward(self, aspp_s, aspp_t):
+        assert aspp_s.shape == aspp_t.shape, 'the output dim of teacher and student differ'
+        total_w, total_h = aspp_t.shape[2], aspp_t.shape[3]
+        patch_w, patch_h = int(total_w * self.scale), int(total_h * self.scale)
+        maxpool = nn.MaxPool2d(kernel_size=(patch_w, patch_h), stride=(patch_w, patch_h), padding=0, ceil_mode=True)
+        loss = self.sim_dis_compute(maxpool(aspp_s), maxpool(aspp_t))
+        return loss
+    
+    def forward(self, *inputs, **kwargs):
+        preds_s, preds_t, targets = tuple(inputs)
+        ce_loss_8 = self._aux_forward(preds_s[0], targets[0])
+        ce_loss_14 = self._aux_forward(preds_s[1], targets[1])
+        ce_loss = ce_loss_8 * 0.5 + ce_loss_14 * 0.5
+
+        pi_loss_8 = self._pi_forward(preds_s[0], preds_t[0], targets[0])
+        pi_loss_14 = self._pi_forward(preds_s[1], preds_t[1], targets[1])
+        pi_loss = pi_loss_8 * 0.5 + pi_loss_14 * 0.5
+
+        pa_loss_8 = self._pa_forward(preds_s[2][0], preds_t[2][0])
+        pa_loss_14 = self._pa_forward(preds_s[2][1], preds_t[2][1])
+        pa_loss = pa_loss_8 * 0.5 + pa_loss_14 * 0.5
+        
+        return dict(ce_loss=ce_loss, pi_loss=pi_loss * self.alpha,
+                    pa_loss=pa_loss * self.beta)
+
 class ICNetLoss(nn.CrossEntropyLoss):
     """Cross Entropy Loss for ICNet"""
     def __init__(self, aux_weight=0.4, ignore_index=-1, **kwargs):
@@ -366,6 +460,33 @@ class MixLovaszSoftmaxCrossEntropyLoss(nn.CrossEntropyLoss):
             loss_ce += self.aux_weight * aux_loss
         return dict(loss=0.5*loss_lovasz+0.5*loss_ce)
 
+
+class MixLovaszSoftmaxCrossEntropyLossV2(nn.CrossEntropyLoss):
+    def __init__(self, aux=True, aux_weight=0.4, ignore_index=-1, **kwargs):
+        super(MixLovaszSoftmaxCrossEntropyLossV2, self).__init__(ignore_index=ignore_index)
+        self.aux = aux
+        self.aux_weight = aux_weight
+        self.ignore_index = ignore_index
+
+    def _aux_forward(self, *inputs, **kwargs):
+        preds, target = tuple(inputs)
+
+        loss_lovasz = lovasz_softmax(F.softmax(preds[0], dim=1), target, ignore=self.ignore_index)
+        for i in range(1, len(preds)):
+            aux_loss = lovasz_softmax(F.softmax(preds[i], dim=1), target, ignore=self.ignore_index)
+            loss_lovasz += self.aux_weight * aux_loss
+
+        loss_ce = super(MixLovaszSoftmaxCrossEntropyLossV2, self).forward(preds[0], target)
+        for i in range(1, len(preds)):
+            aux_loss = super(MixLovaszSoftmaxCrossEntropyLossV2, self).forward(preds[i], target)
+            loss_ce += self.aux_weight * aux_loss
+        return 0.5*loss_lovasz+0.5*loss_ce
+
+    def forward(self, *inputs, **kwargs):
+        preds, targets = tuple(inputs)
+        loss_8 = self._aux_forward(preds[0], targets[0])
+        loss_14 = self._aux_forward(preds[1], targets[1])
+        return dict(loss_8=loss_8*0.5, loss_14=loss_14*0.5)
 
 class LovaszSoftmax(nn.Module):
     def __init__(self, aux=True, aux_weight=0.2, ignore_index=-1, **kwargs):
@@ -580,6 +701,9 @@ def get_segmentation_loss(model, use_ohem=False, **kwargs):
     elif cfg.SOLVER.LOSS_NAME == 'lovasz-ce':
         logging.info('Use lovasz loss and cross entropy!')
         return MixLovaszSoftmaxCrossEntropyLoss(**kwargs)
+    elif cfg.SOLVER.LOSS_NAME == 'lovasz-ce-v2':
+        logging.info('Use lovasz loss and cross entropy!')
+        return MixLovaszSoftmaxCrossEntropyLossV2(**kwargs)
     elif cfg.SOLVER.LOSS_NAME == 'focal':
         logging.info('Use focal loss!')
         return FocalLoss(**kwargs)
@@ -595,7 +719,9 @@ def get_segmentation_loss(model, use_ohem=False, **kwargs):
     elif cfg.SOLVER.LOSS_NAME == 'distill':
         logging.info('Use distill loss!')
         return MixDistillLossAndCrossEntropyLoss(**kwargs)
-    
+    elif cfg.SOLVER.LOSS_NAME == 'distillv2':
+        logging.info('Use distillv2 loss!')
+        return MixDistillLossAndCrossEntropyLossV2(**kwargs)
     model = model.lower()
     if model == 'icnet':
         return ICNetLoss(**kwargs)

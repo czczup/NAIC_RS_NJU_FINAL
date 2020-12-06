@@ -106,8 +106,12 @@ cfg.SOLVER.LOSS_NAME = ''
 cfg.SOLVER.USE_FP16 = False
 
 cfg.DISTILL.TEMPERATURE = 1.0
-cfg.DISTILL.ALPHA = 10.0
-
+cfg.DISTILL.ALPHA = 1.0
+cfg.DISTILL.BETA = 0.5
+cfg.DISTILL.SCALE = 0.5
+cfg.DISTILL.TEACHER_NAME = ''
+cfg.DISTILL.TEACHER_PRETRAINED_PATH = ''
+cfg.DISTILL.TEACHER_BACKBONE = ''
 ########################## test config ###########################################
 # val/test model path
 cfg.TEST.TEST_MODEL_PATH = ''

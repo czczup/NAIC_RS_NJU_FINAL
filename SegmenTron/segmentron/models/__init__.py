@@ -29,5 +29,5 @@ from .edanet import EDANet
 from .pointrend import PointRend
 from .deeplabv3_plus_v2 import DeepLabV3PlusV2
 from .dunetv2 import DUNetV2
-from .deeplabv3_plus_v3 import DeepLabV3PlusV3
-from .deeplabv3_plus_v4 import DeepLabV3PlusV4
+from .deeplabv3_plus_v2_teacher import DeepLabV3PlusV2Teacher
+from .deeplabv3_plus_v2_student import DeepLabV3PlusV2Student

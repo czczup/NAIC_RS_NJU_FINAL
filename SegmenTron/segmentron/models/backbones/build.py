@@ -58,20 +58,16 @@ def load_backbone_pretrained(model, backbone):
             logging.info(msg)
 
 
-def get_segmentation_backbone(backbone, norm_layer=torch.nn.BatchNorm2d):
+def get_segmentation_backbone(backbone, norm_layer=torch.nn.BatchNorm2d, pretrain=True):
     """
     Built the backbone model, defined by `cfg.MODEL.BACKBONE`.
     """
     model = BACKBONE_REGISTRY.get(backbone)(norm_layer)
-    # if backbone in ['resnext101_64x4d', 'resnext152_32x4d', 'resnext50_32x4d_dcn',
-    #                 'resnext101_64x4d_dcn', 'resnext152_32x4d_dcn']:
-    #     logging.info("Loading pretrained %s..."%backbone)
-    logging.info('Load backbone pretrained model from {}'.format(
-        cfg.TRAIN.BACKBONE_PRETRAINED_PATH
-    ))
-    load_checkpoint(model, cfg.TRAIN.BACKBONE_PRETRAINED_PATH, strict=False, logger=logging)
-    # else:
-    #     load_backbone_pretrained(model, backbone)
+    if pretrain:
+        logging.info('Load backbone pretrained model from {}'.format(
+            cfg.TRAIN.BACKBONE_PRETRAINED_PATH
+        ))
+        load_checkpoint(model, cfg.TRAIN.BACKBONE_PRETRAINED_PATH, strict=False, logger=logging)
     return model
 
 

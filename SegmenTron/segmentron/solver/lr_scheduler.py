@@ -75,15 +75,12 @@ class WarmupCyclePolyLR(torch.optim.lr_scheduler._LRScheduler):
                 raise ValueError("Unknown warmup type.")
             return [self.target_lr + (base_lr - self.target_lr) * warmup_factor for base_lr in self.base_lrs]
         
-        if self.last_epoch < self.max_iters // 2:
-            factor = pow(1 - T / (N/2), self.power)
-            return [self.target_lr + (base_lr - self.target_lr) * factor for base_lr in self.base_lrs]
-        else:
-            tempN = N // 2 // 3
-            tempT = T % tempN
-            factor = pow(1 - tempT / tempN, self.power)
-            tempF = 0.5 ** ((T-N//2)//tempN+1)
-            return [self.target_lr + (base_lr - self.target_lr) * factor * tempF for base_lr in self.base_lrs]
+
+        tempN = N // 6
+        tempT = T % tempN
+        factor = pow(1 - tempT / tempN, self.power)
+        tempF = 0.5 ** (T//tempN)
+        return [self.target_lr + (base_lr - self.target_lr) * factor * tempF for base_lr in self.base_lrs]
 
         
 class WarmupConstantLR(torch.optim.lr_scheduler._LRScheduler):
