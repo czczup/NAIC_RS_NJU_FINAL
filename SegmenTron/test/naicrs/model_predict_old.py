@@ -1,3 +1,8 @@
+import nvidia.dali.ops as ops
+import nvidia.dali.types as types
+import nvidia.dali as dali
+from nvidia.dali.pipeline import Pipeline
+from nvidia.dali.plugin.pytorch import feed_ndarray as feed_ndarray
 import torch
 from torchvision import transforms
 import torch.nn.functional as F
@@ -7,15 +12,45 @@ import cv2
 import os
 import math
 
-batch_size = 16
-device = torch.device("cuda")
-transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406],
-                             [0.229, 0.224, 0.225]),
-    ])
 
+class ExternalInputIterator(object):
+    def __init__(self):
+        self.image_path = None
+        self.last_image_path = None
 
+    def __iter__(self):
+        self.i = 0
+        self.n = 1
+        return self
+
+    def __next__(self):
+        if self.i < self.n:
+            image = np.fromfile(self.image_path, dtype=np.uint8)
+            self.last_image_path = self.image_path
+            self.i = 1
+            return ([image],)
+        else:
+            raise StopIteration
+
+    def init(self, image_path):
+        self.image_path = image_path
+        self.i = 0
+
+class ExternalSourcePipeline(Pipeline):
+    def __init__(self, batch_size, eii, num_threads, device_id):
+        super(ExternalSourcePipeline, self).__init__(batch_size,
+                                                     num_threads,
+                                                     device_id,
+                                                     seed=12,
+                                                     prefetch_queue_depth=1)
+        self.source = ops.ExternalSource(source=eii, num_outputs=1)
+        self.decode = ops.ImageDecoder(device="mixed", output_type=types.RGB)
+    
+    def define_graph(self):
+        images = self.source()
+        images = self.decode(images)
+        return images
+    
 class Scale():
     def __init__(self, crop_size, upsample_rate, stride):
         self.crop_size = crop_size
@@ -23,15 +58,33 @@ class Scale():
         self.base_size = int(crop_size * upsample_rate)
         self.stride = stride
 
+batch_size = 8
+device = torch.device("cuda")
+transform = transforms.Compose([
+            transforms.Normalize([0.485, 0.456, 0.406],
+                                 [0.229, 0.224, 0.225]),
+        ])
+eii = ExternalInputIterator()
+pipe = ExternalSourcePipeline(batch_size=1, eii=eii, num_threads=1, device_id=0)
+pipe.build()
 
 def predict(model, input_path, output_dir, args):
     filename = os.path.basename(input_path)
     filename, _ = os.path.splitext(filename)
-    image = Image.open(input_path).convert('RGB')
-
-    image = transform(image)
-    image = torch.unsqueeze(image, dim=0).to(device)
-    
+    if args.dali:
+        eii.init(input_path)
+        image = pipe.run()[0][0]
+        empty = torch.empty(size=image.shape(), device=device, dtype=torch.uint8)
+        stream = torch.cuda.current_stream(device=device)
+        feed_ndarray(image, empty, cuda_stream=stream)
+        empty = empty.permute((2, 0, 1))
+        image = transform(empty / 255.0).unsqueeze(0)
+    else:
+        image = Image.open(input_path).convert('RGB')
+        image = torch.tensor(np.array(image),dtype=torch.uint8).permute(2,0,1).to(device)
+        image = transform(image/255.0)
+        image = torch.unsqueeze(image, dim=0)
+        
     with torch.no_grad():
         multi_scale_predict(model, image, filename, output_dir, args)
         torch.cuda.empty_cache()

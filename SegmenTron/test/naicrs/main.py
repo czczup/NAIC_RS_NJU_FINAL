@@ -185,6 +185,7 @@ if __name__ == '__main__':
     parser.add_argument('--model', type=str, help='model')
     parser.add_argument('--new', action="store_true", help='new')
     parser.add_argument('--stride', default=32, type=int, help='stride')
+    parser.add_argument('--dali', action="store_true", help='dali')
 
     args = parser.parse_args()
     
