@@ -65,7 +65,7 @@ transform = transforms.Compose([
                                  [0.229, 0.224, 0.225]),
         ])
 eii = ExternalInputIterator()
-pipe = ExternalSourcePipeline(batch_size=1, eii=eii, num_threads=1, device_id=0)
+pipe = ExternalSourcePipeline(batch_size=1, eii=eii, num_threads=4, device_id=0)
 pipe.build()
 
 def predict(model, input_path, output_dir, args):
@@ -156,7 +156,7 @@ def multi_scale_predict(model, image, filename, output_dir, args):
     else:
         predict += 1
         predict[predict >= 4] += 3
-        predict = predict.cpu().data.numpy()
-        predict = predict.astype(np.uint8)
+        predict = predict.to(torch.uint8).cpu().data.numpy()
+        # predict = predict.astype(np.uint8)
     
     cv2.imwrite(os.path.join(output_dir, filename + ".png"), predict)

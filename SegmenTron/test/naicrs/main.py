@@ -20,7 +20,7 @@ def generate_outputs(pyfile_path, input_paths, output_dir, args):
     init_model = getattr(importlib.import_module(define_py), "init_model")
     predict = getattr(importlib.import_module(predict_py), "predict")
 
-    model = init_model(args.model)
+    model = init_model(args)
     start_time = time.time()
     for input_path in tqdm(input_paths):
         predict(model, input_path, output_dir, args)
@@ -83,7 +83,6 @@ def get_iou_datasetC():
         table.append([cls_name, category_iou[i]])
     print('Category iou: \n {}'.format(tabulate(table, headers, tablefmt='grid', showindex="always",
                                                 numalign='center', stralign='center')))
-
 
 def get_iou_datasetC_v2():
     classes = ("水体", "道路", "建筑物", "停车场", "操场",
@@ -186,7 +185,7 @@ if __name__ == '__main__':
     parser.add_argument('--new', action="store_true", help='new')
     parser.add_argument('--stride', default=32, type=int, help='stride')
     parser.add_argument('--dali', action="store_true", help='dali')
-
+    parser.add_argument('--quantize', action="store_true", help='quantize')
     args = parser.parse_args()
     
     if args.dataset == "datasetA":
