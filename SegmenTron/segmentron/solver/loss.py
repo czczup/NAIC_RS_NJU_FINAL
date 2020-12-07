@@ -201,17 +201,6 @@ class MixDistillLossAndCrossEntropyLossV2(nn.CrossEntropyLoss):
             loss += self.aux_weight * aux_loss
         return loss
     
-    # def pixel_wise_loss(self, pred_s, pred_t):
-    #     B, C, W, H = pred_s.shape
-    #     soft_log_out = F.log_softmax(pred_s / self.temperature, dim=1)
-    #     soft_t = pred_t / self.temperature
-    #     loss_kd = F.kl_div(soft_log_out, soft_t.detach(), reduction="none")
-    #     loss_kd = loss_kd.sum(dim=1)
-    #     loss_kd = loss_kd.view(B, W * H)
-    #     loss = loss_kd.sum(1) / loss_kd.size(1)
-    #     loss = loss.mean()
-    #     return loss
-    
     def pixel_wise_loss(self, pred_s, pred_t, masked_indices, eps=1E-6):
         B, C, W, H = pred_s.shape
         masked_indices = masked_indices.view(B, -1)  # [8, 640*640]
@@ -266,7 +255,8 @@ class MixDistillLossAndCrossEntropyLossV2(nn.CrossEntropyLoss):
         pi_loss_8 = self._pi_forward(preds_s[0], preds_t[0], targets[0])
         pi_loss_14 = self._pi_forward(preds_s[1], preds_t[1], targets[1])
         pi_loss = pi_loss_8 * 0.5 + pi_loss_14 * 0.5
-
+        
+        
         pa_loss_8 = self._pa_forward(preds_s[2][0], preds_t[2][0])
         pa_loss_14 = self._pa_forward(preds_s[2][1], preds_t[2][1])
         pa_loss = pa_loss_8 * 0.5 + pa_loss_14 * 0.5
