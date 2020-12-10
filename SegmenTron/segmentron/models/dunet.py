@@ -45,7 +45,7 @@ class DUNet(SegBaseModel):
             auxout = self.aux_dupsample(auxout)
             outputs.append(auxout)
         return tuple(outputs)
-
+    
 
 class FeatureFused(nn.Module):
     """Module for fused features"""

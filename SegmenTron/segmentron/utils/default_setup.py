@@ -26,7 +26,8 @@ def default_setup(args):
     if args.launcher != 'none':
         init_dist(args.launcher, backend='nccl')
 
-    save_dir = cfg.TRAIN.LOG_SAVE_DIR if cfg.PHASE == 'train' else None
+    # save_dir = cfg.TRAIN.LOG_SAVE_DIR if cfg.PHASE == 'train' else None
+    save_dir = cfg.TRAIN.LOG_SAVE_DIR
     setup_logger("Segmentron", os.path.join(save_dir, cfg.DIR_NAME), get_rank(),
                  filename=args.config_file.split("/")[-1].split(".")[0]+"_"+str(cfg.TIME_STAMP)+'.txt')
 

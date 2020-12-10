@@ -8,8 +8,7 @@ from .datasetC import NaicrsDatasetC
 from .datasetC_aug import AugDatasetC
 from .datasetAC import DatasetAC
 from .datasetAC_distill import DistillDatasetAC
-from .datasetAC_filter import FilterDatasetAC
-
+from .datasetAC_pseudo import PseudoDatasetAC
 datasets = {
     'datasetA': DatasetA,
     'datasetA_aug': AugDatasetA,
@@ -18,7 +17,8 @@ datasets = {
     'datasetC_aug': AugDatasetC,
     'datasetAC': DatasetAC,
     'datasetAC_distill': DistillDatasetAC,
-    'datasetAC_filter': FilterDatasetAC,
+    'datasetAC_pseudo': PseudoDatasetAC,
+    
 }
 
 

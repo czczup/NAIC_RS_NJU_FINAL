@@ -134,7 +134,7 @@ class Trainer(object):
             self.student = nn.parallel.DataParallel(self.student)
             self.teacher = nn.parallel.DataParallel(self.teacher)
 
-
+        self.distill_base_size = cfg.DISTILL.BASE_SIZE
         # evaluation metrics
         self.metric_A = SegmentationMetric(train_dataset.NUM_CLASS_A, args.distributed)
         self.metric_C = SegmentationMetric(train_dataset.NUM_CLASS_C, args.distributed)
@@ -163,6 +163,8 @@ class Trainer(object):
 
             outputs_s = self.student(images)
             with torch.no_grad():
+                images = F.interpolate(images, size=(self.distill_base_size, self.distill_base_size),
+                                       mode='bilinear', align_corners=True)
                 outputs_t = self.teacher(images)
 
             loss_dict = self.criterion(outputs_s, outputs_t, tuple([targets_8, targets_14]))

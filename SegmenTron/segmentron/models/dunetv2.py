@@ -68,6 +68,28 @@ class DUNetV2(SegBaseModel):
 
         return tuple([outputs1, outputs2])  # 8/14
 
+    def split_v2(self, x):
+        x = torch.split(x, 1, dim=1)
+        x = [x[0], x[1], x[2], x[7], x[7],
+             x[3], x[3], x[4], x[4],
+             x[5], x[5], x[6], x[6], x[7]]
+        input = torch.cat(x, dim=1)
+        return input
+
+    def forward_8_14_to_14_v2(self, x):
+        c_, c2, c3, c4 = self.encoder(x)
+        outputs = list()
+        x1 = self.head(c2, c3, c4)  # 256
+        x1 = self.dupsample(x1)  # 8
+        x1 = F.softmax(x1, dim=1)  # 8
+        x1 = self.split_v2(x1)  # 14
+    
+        x2 = self.head2(c2, c3, c4)  # 256
+        x2 = self.dupsample2(x2)  # 14
+        x2 = F.softmax(x2, dim=1)  # 14
+        x = x1 + x2
+        outputs.append(x)
+        return tuple(outputs)
 
 class FeatureFused(nn.Module):
     """Module for fused features"""

@@ -2,6 +2,7 @@ from __future__ import print_function
 
 import os
 import sys
+import cv2
 
 cur_path = os.path.abspath(os.path.dirname(__file__))
 root_path = os.path.split(cur_path)[0]
@@ -111,11 +112,10 @@ class Evaluator(object):
     def aug_eval(self):
         def evaluate(image, model, original_size, output_size, dims=None):
             image = F.interpolate(image, size=(output_size, output_size), mode='bilinear', align_corners=True)
-            output = model.evaluate(image)
+            output = model.forward_8_14_to_14_v2(image)[0]
             if dims != None:
                 output = torch.flip(output, dims=dims)
             output = F.interpolate(output, size=(original_size, original_size), mode='bilinear', align_corners=True)
-            # output = F.softmax(output, dim=1)
             return output
 
         model = self.init()
@@ -142,19 +142,17 @@ class Evaluator(object):
                     else:
                         output += (output0 + output1 + output2 + output3)
             output = output / 12.0
-            output_ = (output.cpu().numpy()).astype(np.float16)
-            output_ = [output_[i, :, :] for i in range(output_.shape[0])]
+            predict = torch.argmax(output, 1)
+            predict = predict.cpu().data.numpy().astype(np.uint8)
+            predict_ = [predict[i,:,:] for i in range(predict.shape[0])]
 
-            for j in range(len(output_)):
-                filename_j = filename[j].replace("tif", "npy")
-                output_j = output_[j]
+            for j in range(len(predict_)):
+                filename_j = filename[j].replace("tif", "png")
+                predict_j = predict_[j]
                 save_path = os.path.join(out_path, filename_j)
-                np.save(save_path, output_j)
-                
-            self.metric.update(output, target)
-            pixAcc, mIoU = self.metric.get()
-            logging.info("Sample: {:d}, validation pixAcc: {:.3f}, mIoU: {:.3f}".format(
-                i + 1, pixAcc * 100, mIoU * 100))
+                cv2.imwrite(save_path, predict_j)
+            
+            logging.info("Sample: {:d}".format(i + 1))
         logging.info('Eval use time: {:.3f} second'.format(time.time() - time_start))
 
         synchronize()
@@ -186,6 +184,7 @@ class Evaluator(object):
 
 if __name__ == '__main__':
     args = parse_args()
+    cfg.DIR_NAME = args.config_file.split("/")[-1].split(".")[0]
     cfg.update_from_file(args.config_file)
     cfg.update_from_list(args.opts)
     cfg.PHASE = 'test'
@@ -193,10 +192,8 @@ if __name__ == '__main__':
     cfg.check_and_freeze()
     default_setup(args)
 
-    torch.backends.cudnn.benchmark = True
-
     train_id = args.config_file.split("_")[0][-4:]
-    out_path = 'datasets/naicrs/datasetC/trainval/results_' + train_id
+    out_path = 'datasets/naicrs/datasetA/trainval/masks_' + train_id
     try:
         os.mkdir(out_path)
     except:

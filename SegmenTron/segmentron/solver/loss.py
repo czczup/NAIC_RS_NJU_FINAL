@@ -190,9 +190,8 @@ class MixDistillLossAndCrossEntropyLossV2(nn.CrossEntropyLoss):
         self.alpha = cfg.DISTILL.ALPHA
         self.beta = cfg.DISTILL.BETA
         self.temperature = cfg.DISTILL.TEMPERATURE
-        self.scale = cfg.DISTILL.SCALE
-        logging.info("alpha: %d, beta: %f, scale: %f, temperature: %d"
-                     % (self.alpha, self.beta, self.scale, self.temperature))
+        logging.info("alpha: %d, beta: %f, temperature: %d"
+                     % (self.alpha, self.beta, self.temperature))
     
     def _aux_forward(self, preds, target):
         loss = F.cross_entropy(preds[0], target, weight=None, ignore_index=self.ignore_index)
@@ -210,7 +209,7 @@ class MixDistillLossAndCrossEntropyLossV2(nn.CrossEntropyLoss):
         loss_kd = loss_kd.sum(dim=1)  # [8, 640, 640]
         loss_kd = loss_kd.view(B, W * H)  # [8, 640*640]
         loss_kd.masked_fill_(masked_indices, 0)  # [8, 640*640]
-        loss = loss_kd.sum(1) / (loss_kd.size(1) - masked_indices.sum(1) + eps)
+        loss = loss_kd.sum(1) / (loss_kd.size(1) - masked_indices.sum(1) + eps).float()
         loss = loss.mean()
         return loss
     
@@ -220,6 +219,55 @@ class MixDistillLossAndCrossEntropyLossV2(nn.CrossEntropyLoss):
         loss = self.pixel_wise_loss(preds_s[0], preds_t[0], masked_indices)
         for i in range(1, len(preds_s)):
             aux_loss = self.pixel_wise_loss(preds_s[i], preds_t[0], masked_indices)
+            loss += self.aux_weight * aux_loss
+        return loss
+    
+    def forward(self, *inputs, **kwargs):
+        preds_s, preds_t, targets = tuple(inputs)
+        ce_loss_8 = self._aux_forward(preds_s[0], targets[0])
+        ce_loss_14 = self._aux_forward(preds_s[1], targets[1])
+        ce_loss = ce_loss_8 * 0.5 + ce_loss_14 * 0.5
+
+        pi_loss_8 = self._pi_forward(preds_s[0], preds_t[0], targets[0])
+        pi_loss_14 = self._pi_forward(preds_s[1], preds_t[1], targets[1])
+        pi_loss = pi_loss_8 * 0.5 + pi_loss_14 * 0.5
+        
+        return dict(ce_loss=ce_loss * self.beta, pi_loss=pi_loss * self.alpha)
+
+
+class MixDistillLossAndCrossEntropyLossV3(nn.CrossEntropyLoss):
+    def __init__(self, aux=True, aux_weight=0.2, ignore_index=-1, **kwargs):
+        super(MixDistillLossAndCrossEntropyLossV3, self).__init__(ignore_index=ignore_index)
+        self.aux = aux
+        self.aux_weight = aux_weight
+        self.ignore_index = ignore_index
+        self.alpha = cfg.DISTILL.ALPHA
+        self.beta = cfg.DISTILL.BETA
+        self.temperature = cfg.DISTILL.TEMPERATURE
+        self.scale = 0.5
+        logging.info("alpha: %d, beta: %f, temperature: %d"
+                     % (self.alpha, self.beta, self.temperature))
+    
+    def _ce_forward(self, preds, target):
+        loss = F.cross_entropy(preds[0], target, weight=None, ignore_index=self.ignore_index)
+        for i in range(1, len(preds)):
+            aux_loss = F.cross_entropy(preds[i], target, weight=None, ignore_index=self.ignore_index)
+            loss += self.aux_weight * aux_loss
+        return loss
+
+    def pixel_wise_loss(self, pred_s, pred_t):
+        pred_t.detach()
+        N, C, W, H = pred_s.shape
+        softmax_pred_T = F.softmax(pred_t.permute(0, 2, 3, 1).contiguous().view(-1, C), dim=1)
+        logsoftmax = nn.LogSoftmax(dim=1)
+        loss = (torch.sum(
+            - softmax_pred_T * logsoftmax(pred_s.permute(0, 2, 3, 1).contiguous().view(-1, C)))) / W / H / N
+        return loss
+
+    def _pi_forward(self, preds_s, preds_t):
+        loss = self.pixel_wise_loss(preds_s[0], preds_t[0])
+        for i in range(1, len(preds_s)):
+            aux_loss = self.pixel_wise_loss(preds_s[i], preds_t[0])
             loss += self.aux_weight * aux_loss
         return loss
 
@@ -233,36 +281,35 @@ class MixDistillLossAndCrossEntropyLossV2(nn.CrossEntropyLoss):
         feat = feat.reshape(feat.shape[0], feat.shape[1], -1)
         return torch.einsum('icm,icn->imn', [feat, feat])
 
-    def sim_dis_compute(self, f_S, f_T):
-        sim_err = ((self.similarity(f_T) - self.similarity(f_S)) ** 2) / ((f_T.shape[-1] * f_T.shape[-2]) ** 2) / f_T.shape[0]
+    def sim_dis_compute(self, f_s, f_t):
+        sim_err = ((self.similarity(f_t) - self.similarity(f_s)) ** 2) / ((f_t.shape[-1] * f_t.shape[-2]) ** 2) / f_t.shape[0]
         sim_dis = sim_err.sum()
         return sim_dis
 
-    def _pa_forward(self, aspp_s, aspp_t):
-        assert aspp_s.shape == aspp_t.shape, 'the output dim of teacher and student differ'
-        total_w, total_h = aspp_t.shape[2], aspp_t.shape[3]
+    def _pa_forward(self, pred_s, pred_t):
+        pred_t.detach()
+        total_w, total_h = pred_t.shape[2], pred_t.shape[3]
         patch_w, patch_h = int(total_w * self.scale), int(total_h * self.scale)
-        maxpool = nn.MaxPool2d(kernel_size=(patch_w, patch_h), stride=(patch_w, patch_h), padding=0, ceil_mode=True)
-        loss = self.sim_dis_compute(maxpool(aspp_s), maxpool(aspp_t))
+        maxpool = nn.MaxPool2d(kernel_size=(patch_w, patch_h), stride=(patch_w, patch_h), padding=0, ceil_mode=True)  # change
+        loss = self.sim_dis_compute(maxpool(pred_s), maxpool(pred_t))
         return loss
     
     def forward(self, *inputs, **kwargs):
         preds_s, preds_t, targets = tuple(inputs)
-        ce_loss_8 = self._aux_forward(preds_s[0], targets[0])
-        ce_loss_14 = self._aux_forward(preds_s[1], targets[1])
+        ce_loss_8 = self._ce_forward(preds_s[0], targets[0])
+        ce_loss_14 = self._ce_forward(preds_s[1], targets[1])
         ce_loss = ce_loss_8 * 0.5 + ce_loss_14 * 0.5
-
-        pi_loss_8 = self._pi_forward(preds_s[0], preds_t[0], targets[0])
-        pi_loss_14 = self._pi_forward(preds_s[1], preds_t[1], targets[1])
-        pi_loss = pi_loss_8 * 0.5 + pi_loss_14 * 0.5
         
+        pi_loss_8 = self._pi_forward(preds_s[0], preds_t[0])
+        pi_loss_14 = self._pi_forward(preds_s[1], preds_t[1])
+        pi_loss = pi_loss_8 * 0.5 + pi_loss_14 * 0.5
         
         pa_loss_8 = self._pa_forward(preds_s[2][0], preds_t[2][0])
         pa_loss_14 = self._pa_forward(preds_s[2][1], preds_t[2][1])
         pa_loss = pa_loss_8 * 0.5 + pa_loss_14 * 0.5
         
-        return dict(ce_loss=ce_loss, pi_loss=pi_loss * self.alpha,
-                    pa_loss=pa_loss * self.beta)
+        return dict(ce_loss=ce_loss, pi_loss=pi_loss * self.alpha, pa_loss=pa_loss * self.beta)
+
 
 class ICNetLoss(nn.CrossEntropyLoss):
     """Cross Entropy Loss for ICNet"""
@@ -712,6 +759,10 @@ def get_segmentation_loss(model, use_ohem=False, **kwargs):
     elif cfg.SOLVER.LOSS_NAME == 'distillv2':
         logging.info('Use distillv2 loss!')
         return MixDistillLossAndCrossEntropyLossV2(**kwargs)
+    elif cfg.SOLVER.LOSS_NAME == 'distillv3':
+        logging.info('Use distillv3 loss!')
+        return MixDistillLossAndCrossEntropyLossV3(**kwargs)
+    
     model = model.lower()
     if model == 'icnet':
         return ICNetLoss(**kwargs)
