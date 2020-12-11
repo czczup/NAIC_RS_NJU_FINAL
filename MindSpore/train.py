@@ -74,7 +74,7 @@ def parse_args():
     parser.add_argument('--loss_scale', type=float, default=3072.0, help='loss scale')
 
     # model
-    parser.add_argument('--model', type=str, default='deeplab_v3_s16', help='select model')
+    parser.add_argument('--model', type=str, default='deeplabv3plus', help='select model')
     parser.add_argument('--freeze_bn', action='store_true', help='freeze bn')
     parser.add_argument('--aux', action='store_true', help='aux')
     parser.add_argument('--ckpt_pre_trained', type=str, default='', help='pretrained model')

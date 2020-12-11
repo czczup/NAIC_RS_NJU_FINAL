@@ -18,35 +18,37 @@ import os
 import argparse
 import numpy as np
 import cv2
-from mindspore import Tensor
+from mindspore import Tensor, Parameter
 import mindspore.common.dtype as mstype
 import mindspore.ops as P
 import mindspore.nn as nn
 from mindspore import context
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from src.nets import net_factory
+import torch
 context.set_context(mode=context.GRAPH_MODE, device_target="GPU", save_graphs=False,
                     device_id=int(os.getenv('DEVICE_ID')))
 
 
 def parse_args():
-    parser = argparse.ArgumentParser('mindspore deeplabv3 eval')
+    parser = argparse.ArgumentParser('mindspore deeplabv3plus eval')
 
     # val data
     parser.add_argument('--data_root', type=str, default='', help='root path of val data')
     parser.add_argument('--data_lst', type=str, default='', help='list of val data')
-    parser.add_argument('--batch_size', type=int, default=16, help='batch size')
-    parser.add_argument('--crop_size', type=int, default=513, help='crop size')
-    parser.add_argument('--image_mean', type=list, default=[103.53, 116.28, 123.675], help='image mean')
-    parser.add_argument('--image_std', type=list, default=[57.375, 57.120, 58.395], help='image std')
+    parser.add_argument('--batch_size', type=int, default=1, help='batch size')
+    parser.add_argument('--crop_size', type=int, default=256, help='crop size')
+    parser.add_argument('--image_mean', type=list, default=[0.485, 0.456, 0.406], help='image mean')
+    parser.add_argument('--image_std', type=list, default=[0.229, 0.224, 0.225], help='image std')
     parser.add_argument('--scales', type=float, action='append', help='scales of evaluation')
     parser.add_argument('--flip', action='store_true', help='perform left-right flip')
-    parser.add_argument('--ignore_label', type=int, default=255, help='ignore label')
-    parser.add_argument('--num_classes', type=int, default=21, help='number of classes')
+    parser.add_argument('--ignore_label', type=int, default=-1, help='ignore label')
+    parser.add_argument('--num_classes', type=int, default=14, help='number of classes')
 
     # model
     parser.add_argument('--model', type=str, default='deeplab_v3_s16', help='select model')
     parser.add_argument('--freeze_bn', action='store_true', default=False, help='freeze bn')
+    parser.add_argument('--pth_path', type=str, default='', help='model to evaluate')
     parser.add_argument('--ckpt_path', type=str, default='', help='model to evaluate')
 
     args, _ = parser.parse_known_args()
@@ -70,28 +72,17 @@ def resize_long(img, long_size=513):
     return imo
 
 
-class BuildEvalNetwork(nn.Cell):
-    def __init__(self, network):
-        super(BuildEvalNetwork, self).__init__()
-        self.network = network
-        self.transpose = P.Transpose()
-        self.softmax = nn.Softmax()
-
-    def construct(self, input_data):
-        output = self.network(input_data)
-        output = self.transpose(output,(0,2,3,1))
-        output = self.softmax(output)
-        output = self.transpose(output,(0,3,1,2))
-        return output
 
 def pre_process(args, img_, crop_size=513):
     # resize
+    img_ = cv2.cvtColor(img_, cv2.COLOR_BGR2RGB)  # to RGB image
     img_ = resize_long(img_, crop_size)
     resize_h, resize_w, _ = img_.shape
 
     # mean, std
     image_mean = np.array(args.image_mean)
     image_std = np.array(args.image_std)
+    img_ = img_ / 255.0
     img_ = (img_ - image_mean) / image_std
 
     # pad to crop_size
@@ -105,7 +96,7 @@ def pre_process(args, img_, crop_size=513):
     return img_, resize_h, resize_w
 
 
-def eval_batch(args, eval_net, img_lst, crop_size=513, flip=True):
+def eval_batch(args, eval_net, img_lst, crop_size=256):
     result_lst = []
     batch_size = len(img_lst)
     batch_img = np.zeros((args.batch_size, 3, crop_size, crop_size), dtype=np.float32)
@@ -119,10 +110,6 @@ def eval_batch(args, eval_net, img_lst, crop_size=513, flip=True):
     batch_img = np.ascontiguousarray(batch_img)
     net_out = eval_net(Tensor(batch_img, mstype.float32))
     net_out = net_out.asnumpy()
-    if flip:
-        batch_img = batch_img[:, :, :, ::-1]
-        net_out_flip = eval_net(Tensor(batch_img, mstype.float32))
-        net_out += net_out_flip.asnumpy()[:, :, :, ::-1]
 
     for bs in range(batch_size):
         probs_ = net_out[bs][:, :resize_hw[bs][0], :resize_hw[bs][1]].transpose((1, 2, 0))
@@ -134,11 +121,11 @@ def eval_batch(args, eval_net, img_lst, crop_size=513, flip=True):
 
 
 def eval_batch_scales(args, eval_net, img_lst, scales,
-                      base_crop_size=513, flip=True):
+                      base_crop_size=256):
     sizes_ = [int((base_crop_size - 1) * sc) + 1 for sc in scales]
-    probs_lst = eval_batch(args, eval_net, img_lst, crop_size=sizes_[0], flip=flip)
+    probs_lst = eval_batch(args, eval_net, img_lst, crop_size=sizes_[0])
     for crop_size_ in sizes_[1:]:
-        probs_lst_tmp = eval_batch(args, eval_net, img_lst, crop_size=crop_size_, flip=flip)
+        probs_lst_tmp = eval_batch(args, eval_net, img_lst, crop_size=crop_size_)
         for pl, _ in enumerate(probs_lst):
             probs_lst[pl] += probs_lst_tmp[pl]
 
@@ -156,20 +143,45 @@ def net_eval():
         img_lst = f.readlines()
 
     # network
-    if args.model == 'deeplab_v3_s16':
-        network = net_factory.nets_map[args.model]('eval', args.num_classes, 16, args.freeze_bn)
-    elif args.model == 'deeplab_v3_s8':
-        network = net_factory.nets_map[args.model]('eval', args.num_classes, 8, args.freeze_bn)
-    else:
-        raise NotImplementedError('model [{:s}] not recognized'.format(args.model))
+    print(args.freeze_bn)
+    network = net_factory.nets_map[args.model]('eval', args.num_classes, 8, False, args.freeze_bn)
 
-    eval_net = BuildEvalNetwork(network)
+    eval_net = network
 
-    # load model
-    #param_dict = load_checkpoint(args.ckpt_path)
-    #load_param_into_net(eval_net, param_dict)
+    p2m = open("runs/checkpoints/pytorch2mindspore.csv", "r+")
+    p2m = [line[:-1].split(",") for line in p2m.readlines()]
+    p2m = {item[0]:item[1] for item in p2m}
+
+    state_dict = torch.load(args.pth_path)
+    param_dict = dict()
+    for k, v in state_dict.items():
+        print(k, k in p2m)
+        if k in p2m:
+            parameter = v.cpu().data.numpy()
+            print(len(parameter.shape))
+            # if len(parameter.shape) == 4:
+            #     parameter = parameter.transpose(1, 0, 2, 3)
+            parameter = Parameter(Tensor(parameter), name=p2m[k])
+            param_dict[p2m[k]] = parameter
+    load_param_into_net(eval_net, param_dict)
     eval_net.set_train(False)
-
+    # debug
+    # c1 = Tensor(-np.ones([1, 32, 160, 160]), mstype.float32)
+    # c4 = Tensor(-np.ones([1, 248, 80, 80]), mstype.float32)
+    # net_out = eval_net(c4, c1)
+    # net_out = net_out.asnumpy()[0][-2]
+    # net_out = net_out.asnumpy()
+    # print(net_out.sum(3).sum(2))
+    
+    # print(net_out)
+    # print(net_out[...,37:43,37:43])
+    # print(net_out.shape)
+    # print(param_dict['network.head.aspp.image_pooling.0.weight'][0])
+    # print(param_dict['network.head.aspp.image_pooling.1.gamma'][0])
+    # print(param_dict['network.head.aspp.image_pooling.1.beta'][0])
+    # print(param_dict['network.head.aspp.image_pooling.1.moving_mean'][0])
+    # print(param_dict['network.head.aspp.image_pooling.1.moving_variance'][0])
+    # exit(0)
     # evaluate
     hist = np.zeros((args.num_classes, args.num_classes))
     batch_img_lst = []
@@ -180,14 +192,24 @@ def net_eval():
         img_path, msk_path = line.strip().split(' ')
         img_path = os.path.join(args.data_root, img_path)
         msk_path = os.path.join(args.data_root, msk_path)
+        basename = os.path.basename(msk_path)
         img_ = cv2.imread(img_path)
         msk_ = cv2.imread(msk_path, cv2.IMREAD_GRAYSCALE)
+        if "datasetA" in msk_path:
+            msk_ = msk_ // 100 - 1
+        elif "datasetC" in msk_path:
+            msk_[msk_==4] = 2
+            msk_[msk_>=7] -= 3
+            msk_ = msk_- 1
         batch_img_lst.append(img_)
         batch_msk_lst.append(msk_)
         bi += 1
         if bi == args.batch_size:
             batch_res = eval_batch_scales(args, eval_net, batch_img_lst, scales=args.scales,
-                                          base_crop_size=args.crop_size, flip=args.flip)
+                                          base_crop_size=args.crop_size)
+            res = batch_res[0]
+            cv2.imwrite(basename.split(".")[0] + "_.png", res)
+
             for mi in range(args.batch_size):
                 hist += cal_hist(batch_msk_lst[mi].flatten(), batch_res[mi].flatten(), args.num_classes)
 
@@ -196,19 +218,21 @@ def net_eval():
             batch_msk_lst = []
             print('processed {} images'.format(i+1))
         image_num = i
-'''
+
     if bi > 0:
         batch_res = eval_batch_scales(args, eval_net, batch_img_lst, scales=args.scales,
-                                      base_crop_size=args.crop_size, flip=args.flip)
+                                      base_crop_size=args.crop_size)
+        res = batch_res[0]
+        cv2.imwrite(basename.split(".")[0]+"_.png", res)
         for mi in range(bi):
             hist += cal_hist(batch_msk_lst[mi].flatten(), batch_res[mi].flatten(), args.num_classes)
         print('processed {} images'.format(image_num + 1))
 
-    print(hist)
+    # print(hist)
     iu = np.diag(hist) / (hist.sum(1) + hist.sum(0) - np.diag(hist))
     print('per-class IoU', iu)
     print('mean IoU', np.nanmean(iu))
-'''
+
 
 if __name__ == '__main__':
     print('main!')

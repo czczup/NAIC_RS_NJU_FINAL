@@ -46,7 +46,7 @@ do
                                                --max_scale=2.0  \
                                                --ignore_label=255  \
                                                --num_classes=21  \
-                                               --model=deeplab_v3_s8  \
+                                               --model=deeplabv3plus  \
                                                --loss_scale=2048  \
                                                --ckpt_pre_trained=/PATH/TO/PRETRAIN_MODEL  \
                                                --is_distributed  \

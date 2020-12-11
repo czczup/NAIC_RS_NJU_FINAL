@@ -28,7 +28,7 @@ def build_activation(act_func):
     else:
         raise ValueError('do not support: %s' % act_func)
 
-def set_layer_from_config(layer_config):
+def set_layer_from_config(layer_config, use_batch_statistics):
     if layer_config is None:
         return None
 
@@ -43,14 +43,14 @@ def set_layer_from_config(layer_config):
         return True
     else:
         layer = name2layer[layer_name]
-        return layer.build_from_config(layer_config)
+        return layer.build_from_config(layer_config, use_batch_statistics)
 
 
 class ConvLayer(nn.Cell):
 
     def __init__(self, in_channels, out_channels,
                  kernel_size=3, stride=2, dilation=1, groups=1, bias=False, has_shuffle=False,
-                 use_bn=True, act_func='relu6', dropout_rate=0, ops_order='weight_bn_act'):
+                 use_bn=True, act_func='relu6', dropout_rate=0, ops_order='weight_bn_act', use_batch_statistics=True):
         super(ConvLayer, self).__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -62,7 +62,7 @@ class ConvLayer(nn.Cell):
         self.conv = nn.Conv2d(
             self.in_channels, self.out_channels, kernel_size=self.kernel_size, stride=self.stride, pad_mode='same',
             dilation=self.dilation, group=self.groups, has_bias=self.bias, weight_init='he_uniform')
-        self.bn = nn.BatchNorm2d(self.out_channels)
+        self.bn = nn.BatchNorm2d(self.out_channels, use_batch_statistics=None, eps=1e-3)
         self.act = build_activation(act_func)
 
     def construct(self, x):
@@ -73,14 +73,16 @@ class ConvLayer(nn.Cell):
         return x
 
     @staticmethod
-    def build_from_config(config):
+    def build_from_config(config, use_batch_statistics):
+        config['use_batch_statistics'] = use_batch_statistics
         return ConvLayer(**config)
 
 
 class MBInvertedConvLayer(nn.Cell):
 
     def __init__(self, in_channels, out_channels,
-                 kernel_size=3, stride=1, expand_ratio=6, dilation=1, mid_channels=None, act_func='relu6', use_se=False):
+                 kernel_size=3, stride=1, expand_ratio=6, dilation=1, mid_channels=None, act_func='relu6', use_se=False,
+                 use_batch_statistics=True):
         super(MBInvertedConvLayer, self).__init__()
 
         self.in_channels = in_channels
@@ -103,14 +105,14 @@ class MBInvertedConvLayer(nn.Cell):
         else:
             self.inverted_bottleneck = nn.SequentialCell(OrderedDict([
                 ('conv', nn.Conv2d(self.in_channels, feature_dim, 1, 1, pad_mode='valid', has_bias=False, weight_init='he_uniform')),
-                ('bn', nn.BatchNorm2d(feature_dim)),
+                ('bn', nn.BatchNorm2d(feature_dim, use_batch_statistics=use_batch_statistics, eps=1e-3)),
                 ('act', build_activation(self.act_func)),
             ]))
 
         depth_conv_modules = [
             ('conv', nn.Conv2d(feature_dim, feature_dim, kernel_size, stride, pad_mode='same',
                                group=feature_dim, has_bias=False, dilation=dilation, weight_init='he_uniform')),
-            ('bn', nn.BatchNorm2d(feature_dim)),
+            ('bn', nn.BatchNorm2d(feature_dim, use_batch_statistics=use_batch_statistics, eps=1e-3)),
             ('act', build_activation(self.act_func))
         ]
         
@@ -118,7 +120,7 @@ class MBInvertedConvLayer(nn.Cell):
 
         self.point_linear = nn.SequentialCell(OrderedDict([
             ('conv', nn.Conv2d(feature_dim, out_channels, 1, 1, pad_mode='valid', has_bias=False, weight_init='he_uniform')),
-            ('bn', nn.BatchNorm2d(out_channels)),
+            ('bn', nn.BatchNorm2d(out_channels, use_batch_statistics=use_batch_statistics, eps=1e-3)),
         ]))
 
     def construct(self, x):
@@ -129,7 +131,8 @@ class MBInvertedConvLayer(nn.Cell):
         return x
 
     @staticmethod
-    def build_from_config(config):
+    def build_from_config(config, use_batch_statistics):
+        config['use_batch_statistics'] = use_batch_statistics
         return MBInvertedConvLayer(**config)
 
 
@@ -150,11 +153,12 @@ class MobileInvertedResidualBlock(nn.Cell):
         else:
             res = self.mobile_inverted_conv(x)
         return res
-    
+
+
     @staticmethod
-    def build_from_config(config):
-        mobile_inverted_conv = set_layer_from_config(config['mobile_inverted_conv'])
-        shortcut = set_layer_from_config(config['shortcut'])
+    def build_from_config(config, use_batch_statistics):
+        mobile_inverted_conv = set_layer_from_config(config['mobile_inverted_conv'], use_batch_statistics)
+        shortcut = set_layer_from_config(config['shortcut'], use_batch_statistics)
         block = MobileInvertedResidualBlock(mobile_inverted_conv, shortcut)
         return block
 
@@ -199,21 +203,19 @@ class ProxylessNASNets(nn.Cell):
         x = self.block11(c3)
         x = self.block12(x)
         c4 = self.block13(x)
-
         return c1, c2, c3, c4
 
     @staticmethod
-    def build_from_config(config):
-        first_conv = set_layer_from_config(config['first_conv'])
+    def build_from_config(config, use_batch_statistics):
+        first_conv = set_layer_from_config(config['first_conv'], use_batch_statistics)
         blocks = []
         for index, block_config in enumerate(config['blocks']):
-            blocks.append(MobileInvertedResidualBlock.build_from_config(block_config))
+            blocks.append(MobileInvertedResidualBlock.build_from_config(block_config, use_batch_statistics))
         net = ProxylessNASNets(first_conv, blocks)
         if 'bn' in config:
             net.set_bn_param(**config['bn'])
         else:
             net.set_bn_param(momentum=0.1, eps=1e-3)
-        
         return net
     
     def set_bn_param(self, momentum, eps):
@@ -223,6 +225,6 @@ class ProxylessNASNets(nn.Cell):
                 m.eps = eps
         return
 
-def ofa_v100_gpu64_6ms():
+def ofa_v100_gpu64_6ms(use_batch_statistics=True):
     net_config = json.load(open(os.path.join(os.path.dirname(__file__), 'net.config'), 'r'))
-    return ProxylessNASNets.build_from_config(net_config)
+    return ProxylessNASNets.build_from_config(net_config, use_batch_statistics)

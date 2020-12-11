@@ -14,22 +14,18 @@
 # limitations under the License.
 # ============================================================================
 
-export DEVICE_ID=0
+export DEVICE_ID=5
 export SLOG_PRINT_TO_STDOUT=0
-train_code_path="/home/mindspore/model_zoo/official/cv/deeplabv3/"
-eval_path="/home/mindspore/model_zoo/official/cv/deeplabv3/eval"
 
-if [ -d ${eval_path} ]; then
-  rm -rf ${eval_path}
-fi
-mkdir -p ${eval_path}
 
-python ${train_code_path}/eval.py --data_root="/home/mindspore/dataset"  \
-                    --data_lst="/home/mindspore/dataset/list_demo.txt"  \
-                    --batch_size=1  \
-                    --crop_size=256  \
-                    --num_classes=14  \
-                    --model=deeplab_v3_s8  \
-                    --scales=1.0  \
-                    --freeze_bn 
+python eval.py --data_root="datasets/naicrs/datasetC/trainval"  \
+               --data_lst="datasets/naicrs/txt/valC_.txt"  \
+               --batch_size=8  \
+               --crop_size=256  \
+               --num_classes=14  \
+               --model=deeplabv3plusv2  \
+               --scales=1.0  \
+               --pth_path="runs/checkpoints/0046.pth"  \
+               --ckpt_path="runs/checkpoints/deeplabv3plus-1_60.ckpt"  \
+               --freeze_bn
 

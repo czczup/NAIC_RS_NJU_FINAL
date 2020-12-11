@@ -12,13 +12,13 @@
 # ============================================================================
 
 export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
-export DEVICE_ID=7
+export DEVICE_ID=5
 export SLOG_PRINT_TO_STDOUT=0
 
 python train.py --data_file="datasets/naicrs/datasetC/mindrecord"  \
                     --train_dir="runs/checkpoints/"  \
                     --train_epochs=60  \
-                    --batch_size=16  \
+                    --batch_size=2  \
                     --crop_size=256  \
                     --base_lr=0.005  \
                     --lr_type=poly  \
@@ -29,4 +29,4 @@ python train.py --data_file="datasets/naicrs/datasetC/mindrecord"  \
                     --model=deeplabv3plus  \
                     --aux  \
                     --ckpt_pre_trained=''  \
-                    --save_steps=1000 \
+                    --save_steps=10 \

@@ -1,0 +1,10 @@
+images/62327.tif masks/62327.png
+images/52916.tif masks/52916.png
+images/66015.tif masks/66015.png
+images/69744.tif masks/69744.png
+images/43665.tif masks/43665.png
+images/38476.tif masks/38476.png
+images/29847.tif masks/29847.png
+images/64196.tif masks/64196.png
+images/50630.tif masks/50630.png
+images/76703.tif masks/76703.png
