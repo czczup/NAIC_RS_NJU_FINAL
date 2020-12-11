@@ -14,3 +14,4 @@ from .ofa_1080ti_gpu64_27ms.main import *
 from .tiny_ofa_1080ti_gpu64_27ms.main import *
 from .ofa_note10_lat_8ms.main import *
 from .ofa_v100_gpu64_6ms.main import *
+from .ofa_flops_595m.main import *

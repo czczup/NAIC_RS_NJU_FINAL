@@ -11,6 +11,7 @@ from segmentron.models.backbones.ibn_shufflenetv2p import ibn_shufflenetv2_plus
 from segmentron.models.backbones.ofa_note10_lat_8ms.main import ofa_note10_lat_8ms, ibn_ofa_note10_lat_8ms
 from segmentron.models.backbones.ofa_v100_gpu64_6ms.main import ofa_v100_gpu64_6ms, ibn_ofa_v100_gpu64_6ms
 from segmentron.models.backbones.resnet import resnet50
+from deeplabv3plus_nearest import DeepLabV3PlusNearest
 from tools import fuse_module
 try:
     import apex
@@ -28,7 +29,9 @@ def init_model(args):
     # model = DeepLabV3Plus(nclass=[8,14], get_backbone=ofa_note10_lat_8ms, channels=[24, 160])
     # model = DeepLabV3Plus(nclass=[8,14], get_backbone=resnext50_32x4d, channels=[256, 2048])
     
-    model = DeepLabV3Plus(nclass=[8,14], get_backbone=ofa_v100_gpu64_6ms, channels=[32, 248])
+    # model = DeepLabV3Plus(nclass=[8,14], get_backbone=ofa_v100_gpu64_6ms, channels=[32, 248])
+    model = DeepLabV3PlusNearest(nclass=[8,14], get_backbone=ofa_v100_gpu64_6ms, channels=[32, 248])
+
     model_path = "../model/%s" % args.model
     print('load test model from {}'.format(model_path))
     
