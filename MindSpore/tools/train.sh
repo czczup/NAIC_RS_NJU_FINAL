@@ -29,4 +29,4 @@ python train.py --data_file="datasets/naicrs/datasetC/mindrecord"  \
                     --model=deeplabv3plus  \
                     --aux  \
                     --ckpt_pre_trained=''  \
-                    --save_steps=10 \
+                    --save_steps=10000 \

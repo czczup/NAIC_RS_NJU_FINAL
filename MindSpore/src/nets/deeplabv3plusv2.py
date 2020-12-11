@@ -7,7 +7,7 @@ import mindspore.ops as ops
 
 
 class DeepLabV3PlusV2(nn.Cell):
-    def __init__(self, phase='train', num_classes=[8, 14], output_stride=8, aux=False, freeze_bn=False):
+    def __init__(self, phase='train', num_classes=[8, 14], output_stride=8, aux=False, freeze_bn=False, mode="03"):
         super(DeepLabV3PlusV2, self).__init__()
         
         self.aux = aux
@@ -34,31 +34,25 @@ class DeepLabV3PlusV2(nn.Cell):
         self.transpose = P.Transpose()
         self.softmax = nn.Softmax()
         self.mul = P.Mul()
-        self.add1 = ops.TensorAdd()
+        self.mode = mode
     
     def train_construct(self, x):
         size = self.shape(x)
         c1, _, c3, c4 = self.encoder(x)
 
-        outputs1 = list()
-        x = self.head(c4, c1)
-        x = P.ResizeNearestNeighbor((size[2], size[3]), True)(x)
-        outputs1.append(x)
+        x1 = self.head(c4, c1)
+        x1 = P.ResizeNearestNeighbor((size[2], size[3]), True)(x1)
+        
+        auxout1 = self.auxlayer(c3)
+        auxout1 = P.ResizeNearestNeighbor((size[2], size[3]), True)(auxout1)
 
-        if self.aux and self.training:
-            auxout = self.auxlayer(c3)
-            auxout = P.ResizeNearestNeighbor((size[2], size[3]), True)(auxout)
-            outputs1.append(auxout)
+        x2 = self.head2(c4, c1)
+        x2 = P.ResizeNearestNeighbor((size[2], size[3]), True)(x2)
 
-        outputs2 = list()
-        x = self.head2(c4, c1)
-        x = P.ResizeNearestNeighbor((size[2], size[3]), True)(x)
-        outputs2.append(x)
-        if self.aux and self.training:
-            auxout = self.auxlayer2(c3)
-            auxout = P.ResizeNearestNeighbor((size[2], size[3]), True)(auxout)
-            outputs2.append(auxout)
-        return tuple([outputs1, outputs2])
+        auxout2 = self.auxlayer2(c3)
+        auxout2 = P.ResizeNearestNeighbor((size[2], size[3]), True)(auxout2)
+
+        return x1, auxout1, x2, auxout2
 
     def split_v2(self, x):
         x = P.Split(1, 8)(x)
@@ -68,13 +62,22 @@ class DeepLabV3PlusV2(nn.Cell):
         x = P.Concat(1)(x)
         return x
 
+    def _merge(self, x):
+        x = P.Split(1, 14)(x)
+        x = (x[0], x[1], x[2], self.add(x[5], x[6]),
+             self.add(x[7], x[8]), self.add(x[9], x[10]),
+             self.add(x[11], x[12]),
+             self.add(self.add(x[3], x[4]), x[13]))
+        x = P.Concat(1)(x)
+        return x
+
     def _softmax(self, x):
         x = self.transpose(x,(0,2,3,1))
         x = self.softmax(x)
         x = self.transpose(x,(0,3,1,2))
         return x
     
-    def test_construct(self, x):
+    def construct_8_14_to_14(self, x):
         size = self.shape(x)
         c1, _, c3, c4 = self.encoder(x)
         
@@ -88,7 +91,59 @@ class DeepLabV3PlusV2(nn.Cell):
         x2 = self._softmax(x2)
         x = self.add(x1, x2)
         return x
-        
+
+    def construct_8_14_to_8(self, x):
+        size = self.shape(x)
+        c1, _, c3, c4 = self.encoder(x)
+
+        x1 = self.head(c4, c1)
+        x1 = P.ResizeNearestNeighbor((size[2], size[3]), True)(x1)
+        x1 = self._softmax(x1)
+
+        x2 = self.head2(c4, c1)
+        x2 = P.ResizeNearestNeighbor((size[2], size[3]), True)(x2)
+        x2 = self._softmax(x2)
+        x2 = self._merge(x2)
+        x = self.add(x1, x2)
+        return x
+    
+    def construct_8_to_8(self, x):
+        size = self.shape(x)
+        c1, _, c3, c4 = self.encoder(x)
+        x = self.head(c4, c1)
+        x = P.ResizeNearestNeighbor((size[2], size[3]), True)(x)
+        x = self._softmax(x)
+        return x
+    
+    def construct_14_to_8(self, x):
+        size = self.shape(x)
+        c1, _, c3, c4 = self.encoder(x)
+        x2 = self.head2(c4, c1)
+        x2 = P.ResizeNearestNeighbor((size[2], size[3]), True)(x2)
+        x2 = self._softmax(x2)
+        x2 = self._merge(x2)
+        return x2
+    
+    def construct_14_to_14(self, x):
+        size = self.shape(x)
+        c1, _, c3, c4 = self.encoder(x)
+        x2 = self.head2(c4, c1)
+        x2 = P.ResizeNearestNeighbor((size[2], size[3]), True)(x2)
+        x2 = self._softmax(x2)
+        return x2
+
+    def test_construct(self, x):
+        if self.mode == "01":
+            return self.construct_8_to_8(x)
+        elif self.mode == "02":
+            return self.construct_14_to_8(x)
+        elif self.mode == "03":
+            return self.construct_8_14_to_8(x)
+        elif self.mode == "04":
+            return self.construct_14_to_14(x)
+        else:
+            return self.construct_8_14_to_14_v2(x)
+
     def construct(self, x):
         if self.training:
             return self.train_construct(x)

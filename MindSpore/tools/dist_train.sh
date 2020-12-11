@@ -15,9 +15,8 @@
 # ============================================================================
 
 ulimit -c unlimited
-train_path=/PATH/TO/EXPERIMENTS_DIR
+train_path=runs/checkpoints/multicards
 export SLOG_PRINT_TO_STDOUT=0
-train_code_path=/PATH/TO/MODEL_ZOO_CODE
 export RANK_TABLE_FILE=${train_code_path}/src/tools/rank_table_8p.json
 export RANK_SIZE=8
 export RANK_START_ID=0

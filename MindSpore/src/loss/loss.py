@@ -80,6 +80,7 @@ class SoftmaxCrossEntropyLossV2(nn.Cell):
         self.div = P.RealDiv()
         self.transpose = P.Transpose()
         self.reshape = P.Reshape()
+        self.add = P.TensorAdd()
     
     def cross_entropy(self, logits, labels, num_class):
         labels_int = self.cast(labels, mstype.int32)
@@ -95,14 +96,14 @@ class SoftmaxCrossEntropyLossV2(nn.Cell):
         loss = self.div(self.sum(loss), self.sum(weights))
         return loss
     
-    def construct(self, logits, labels):
-        loss_8 = self.cross_entropy(logits[0][0], labels[0], num_class=self.num_class[0])
-        if self.aux:
-            loss_8 += self.aux_weight * self.cross_entropy(logits[0][1], labels[0], num_class=self.num_class[0])
+    def construct(self, x1, auxout1, x2, auxout2, label8, label14):
+        loss_8 = self.cross_entropy(x1, label8, num_class=self.num_class[0])
+        loss_8 += self.aux_weight * self.cross_entropy(auxout1, label8, num_class=self.num_class[0])
         
-        loss_14 = self.cross_entropy(logits[1][0], labels[1], num_class=self.num_class[1])
-        if self.aux:
-            loss_14 += self.aux_weight * self.cross_entropy(logits[1][1], labels[1], num_class=self.num_class[1])
+        loss_14 = self.cross_entropy(x2, label14, num_class=self.num_class[1])
+        loss_14 += self.aux_weight * self.cross_entropy(auxout2, label14, num_class=self.num_class[1])
         
-        loss = loss_8 * 0.5 + loss_14 * 0.5
+        loss_8 = self.mul(loss_8, 0.5)
+        loss_14 = self.mul(loss_14, 0.5)
+        loss = self.add(loss_8, loss_14)
         return loss
