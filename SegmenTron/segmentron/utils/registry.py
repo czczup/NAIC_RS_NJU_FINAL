@@ -1,4 +1,4 @@
-# this code heavily based on detectron2
+# this v1 heavily based on detectron2
 
 import logging
 import torch
@@ -11,13 +11,13 @@ class Registry(object):
 
     To create a registry (inside segmentron):
 
-    .. code-block:: python
+    .. v1-block:: python
 
         BACKBONE_REGISTRY = Registry('BACKBONE')
 
     To register an object:
 
-    .. code-block:: python
+    .. v1-block:: python
 
         @BACKBONE_REGISTRY.register()
         class MyBackbone():
@@ -25,7 +25,7 @@ class Registry(object):
 
     Or:
 
-    .. code-block:: python
+    .. v1-block:: python
 
         BACKBONE_REGISTRY.register(MyBackbone)
     """

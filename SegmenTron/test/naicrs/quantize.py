@@ -20,7 +20,7 @@ def quantize_model(model_filename):
     
     torch.quantization.prepare(model, inplace=True)
     torch.quantization.convert(model, inplace=True)
-    print(model)
+
     state_dict = {k: v for k, v in model.state_dict().items() if "scale" not in k and "zero_point" not in k}
     torch.save(state_dict, "../model/%s" % model_filename.split('.')[0]+"q.pth")
 

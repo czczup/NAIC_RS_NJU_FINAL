@@ -156,6 +156,7 @@ def transform_mask(mask):
 
 def net_eval():
     args = parse_args()
+    print(args)
     # data list
     with open(args.data_lst) as f:
         img_lst = f.readlines()
@@ -172,7 +173,6 @@ def net_eval():
     state_dict = torch.load(args.pth_path)
     param_dict = dict()
     for k, v in state_dict.items():
-        print(k, k in p2m)
         if k in p2m:
             parameter = v.cpu().data.numpy()
             parameter = Parameter(Tensor(parameter), name=p2m[k])
@@ -234,5 +234,4 @@ def net_eval():
 
 
 if __name__ == '__main__':
-    print('main!')
     net_eval()

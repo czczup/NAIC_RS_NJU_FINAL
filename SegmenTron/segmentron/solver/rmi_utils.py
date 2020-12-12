@@ -1,4 +1,4 @@
-# This code is adapted from: https://github.com/ZJULearning/RMI
+# This v1 is adapted from: https://github.com/ZJULearning/RMI
 
 # python 2.X, 3.X compatibility
 from __future__ import print_function

@@ -1,5 +1,5 @@
 """
-This code is adapted from: https://github.com/ZJULearning/RMI
+This v1 is adapted from: https://github.com/ZJULearning/RMI
 
 The implementation of the paper:
 Region Mutual Information Loss for Semantic Segmentation.

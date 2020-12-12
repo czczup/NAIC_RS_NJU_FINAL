@@ -135,15 +135,15 @@ def train():
     loss_.add_flags_recursive(fp32=True)
     train_net = BuildTrainNetwork(network, loss_)
 
-    state_dict = torch.load(args.pth_pretrained)
-    param_dict = dict()
-    for k, v in state_dict.items():
-        print(k, k in p2m)
-        if k in p2m:
-            parameter = v.cpu().data.numpy()
-            parameter = Parameter(Tensor(parameter), name=p2m[k])
-            param_dict[p2m[k]] = parameter
-    load_param_into_net(train_net, param_dict)
+    # state_dict = torch.load(args.pth_pretrained)
+    # param_dict = dict()
+    # for k, v in state_dict.items():
+    #     print(k, k in p2m)
+    #     if k in p2m:
+    #         parameter = v.cpu().data.numpy()
+    #         parameter = Parameter(Tensor(parameter), name=p2m[k])
+    #         param_dict[p2m[k]] = parameter
+    # load_param_into_net(train_net, param_dict)
 
     # load pretrained model
     if args.ckpt_pre_trained:

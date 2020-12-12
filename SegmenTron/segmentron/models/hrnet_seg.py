@@ -1,4 +1,4 @@
-# this code is heavily based on https://github.com/HRNet
+# this v1 is heavily based on https://github.com/HRNet
 
 from __future__ import absolute_import
 from __future__ import division

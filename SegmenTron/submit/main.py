@@ -26,5 +26,5 @@ if __name__ == '__main__':
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
         
-    generate_outputs('code', input_paths=input_paths, output_dir=output_dir)
+    generate_outputs('v1', input_paths=input_paths, output_dir=output_dir)
     
