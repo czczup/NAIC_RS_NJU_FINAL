@@ -24,8 +24,8 @@ class Scale():
 
 nclass = 14
 batch_size = 4
-scale1 = Scale(crop_size=256, upsample_rate=2.5, stride=256-80)
-scale2 = Scale(crop_size=320, upsample_rate=2.5*0.8, stride=320-80)
+scale1 = Scale(crop_size=256, upsample_rate=1.0, stride=256-32)
+# scale2 = Scale(crop_size=320, upsample_rate=1.0*0.8, stride=320-80)
 
 
 def predict(model, input_path, output_dir):
@@ -88,9 +88,10 @@ def single_scale_predict_v2(scale: Scale, image, model):
 def multi_scale_predict(model, image, filename, output_dir):
     origin_width, origin_height = image.size(2), image.size(3)
     output1 = single_scale_predict_v2(scale1, image, model)
-    output2 = single_scale_predict_v2(scale2, image, model)
-    output2 = F.interpolate(output2, (output1.size(2), output1.size(3)), mode='bilinear', align_corners=True)
-    output = output1 + output2
+    # output2 = single_scale_predict_v2(scale2, image, model)
+    # output2 = F.interpolate(output2, (output1.size(2), output1.size(3)), mode='bilinear', align_corners=True)
+    # output = output1 + output2
+    output = output1
     
     output = F.interpolate(output, (origin_width, origin_height), mode='bilinear', align_corners=True)
     
@@ -98,7 +99,7 @@ def multi_scale_predict(model, image, filename, output_dir):
     
     predict += 1
     predict[predict >= 4] += 3
-    predict = predict.cpu().data.numpy()
-    predict = predict.astype(np.uint8)
+    predict = predict.to(torch.uint8).cpu().data.numpy()
+    # predict = predict.astype(np.uint8)
     
     cv2.imwrite(os.path.join(output_dir, filename + ".png"), predict)
