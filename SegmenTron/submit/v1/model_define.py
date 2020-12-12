@@ -562,8 +562,8 @@ class _ASPP(nn.Module):
 
 def init_model():
     device = torch.device("cuda")
-    # model = DeepLabV3Plus(nclass=[8, 14], get_backbone=ofa_v100_gpu64_6ms, channels=[32, 248])
-    model = DeepLabV3Plus(nclass=[8, 14], get_backbone=ofa_1080ti_gpu64_27ms_tiny, channels=[32, 416])
+    model = DeepLabV3Plus(nclass=[8, 14], get_backbone=ofa_v100_gpu64_6ms, channels=[32, 248])
+    # model = DeepLabV3Plus(nclass=[8, 14], get_backbone=ofa_1080ti_gpu64_27ms_tiny, channels=[32, 416])
 
     model_path = os.path.join(os.path.dirname(__file__), "best_model.pth")
     print('load test model from {}'.format(model_path))
