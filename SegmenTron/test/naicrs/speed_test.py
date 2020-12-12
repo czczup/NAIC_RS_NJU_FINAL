@@ -12,6 +12,8 @@ from segmentron.models.backbones.shufflenetv2p import shufflenetv2_plus
 from segmentron.models.backbones.ibn_shufflenetv2p import ibn_shufflenetv2_plus
 from segmentron.models.backbones.ofa_note10_lat_8ms.main import ofa_note10_lat_8ms, ibn_ofa_note10_lat_8ms
 from segmentron.models.backbones.ofa_v100_gpu64_6ms.main import ofa_v100_gpu64_6ms, ibn_ofa_v100_gpu64_6ms
+from segmentron.models.backbones.vovnet import vovnet19, vovnet19_dw, vovnet19_slim, vovnet19_slim_dw
+
 from tqdm import tqdm
 from PIL import Image
 import torch
@@ -27,10 +29,10 @@ except:
 
 def test_model(model):
     device = torch.device("cuda")
-    # try:
-    #     model = apex.amp.initialize(model.cuda(), opt_level="O3")
-    # except:
-    #     pass
+    try:
+        model = apex.amp.initialize(model.cuda(), opt_level="O3")
+    except:
+        pass
     model.eval()
     model = model.to(device)
 
@@ -42,7 +44,7 @@ def test_model(model):
     ])
     image = transform(image)
     image = torch.unsqueeze(image, dim=0)
-    batch_size = 1
+    batch_size = 8
     images = [image] * batch_size
     images = torch.cat(images, 0).to(device)
     
@@ -94,27 +96,42 @@ if __name__ == '__main__':
     # model = fuse_module(model)
     # results.append("ibn_tiny_ofa_1080ti_gpu64_27ms: %.2fs/%dpics" % (test_model(model), num))
     # print(results[-1])
-    #
-    model = DeepLabV3Plus(nclass=[8,14], get_backbone=ofa_note10_lat_8ms, channels=[24, 160])
-    model = fuse_module(model)
-    results.append("ofa_note10_lat_8ms: %.2fs/%dpics" % (test_model(model), num))
-    print(results[-1])
-
-    model = DeepLabV3Plus(nclass=[8,14], get_backbone=ibn_ofa_note10_lat_8ms, channels=[24, 160])
-    model = fuse_module(model)
-    results.append("ibn_ofa_note10_lat_8ms: %.2fs/%dpics" % (test_model(model), num))
-    print(results[-1])
-
-    model = DeepLabV3Plus(nclass=[8,14], get_backbone=ofa_v100_gpu64_6ms, channels=[32, 248])
+    # #
+    # model = DeepLabV3Plus(nclass=[8,14], get_backbone=ofa_note10_lat_8ms, channels=[24, 160])
     # model = fuse_module(model)
+    # results.append("ofa_note10_lat_8ms: %.2fs/%dpics" % (test_model(model), num))
+    # print(results[-1])
+    #
+    # model = DeepLabV3Plus(nclass=[8,14], get_backbone=ibn_ofa_note10_lat_8ms, channels=[24, 160])
+    # model = fuse_module(model)
+    # results.append("ibn_ofa_note10_lat_8ms: %.2fs/%dpics" % (test_model(model), num))
+    # print(results[-1])
+
+    model = DeepLabV3Plus(nclass=[8, 14], get_backbone=ofa_v100_gpu64_6ms, channels=[32, 248])
+    model = fuse_module(model)
     results.append("ofa_v100_gpu64_6ms: %.2fs/%dpics" % (test_model(model), num))
     print(results[-1])
-
-    model = DeepLabV3Plus(nclass=[8,14], get_backbone=ibn_ofa_v100_gpu64_6ms, channels=[32, 248])
-    # model = fuse_module(model)
-    results.append("ibn_ofa_v100_gpu64_6ms: %.2fs/%dpics" % (test_model(model), num))
+    
+    model = DeepLabV3Plus(nclass=[8,14], get_backbone=vovnet19, channels=[256, 1024])
+    model = fuse_module(model)
+    results.append("vovnet19: %.2fs/%dpics" % (test_model(model), num))
     print(results[-1])
 
+    model = DeepLabV3Plus(nclass=[8,14], get_backbone=vovnet19_dw, channels=[256, 1024])
+    model = fuse_module(model)
+    results.append("vovnet19_dw: %.2fs/%dpics" % (test_model(model), num))
+    print(results[-1])
+
+    model = DeepLabV3Plus(nclass=[8,14], get_backbone=vovnet19_slim, channels=[112, 512])
+    model = fuse_module(model)
+    results.append("vovnet19_slim: %.2fs/%dpics" % (test_model(model), num))
+    print(results[-1])
+    
+    model = DeepLabV3Plus(nclass=[8,14], get_backbone=vovnet19_slim_dw, channels=[112, 512])
+    model = fuse_module(model)
+    results.append("vovnet19_slim_dw: %.2fs/%dpics" % (test_model(model), num))
+    print(results[-1])
+    
     print("*********")
     for result in results:
         print(result)

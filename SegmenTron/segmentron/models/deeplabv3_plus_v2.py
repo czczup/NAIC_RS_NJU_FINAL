@@ -20,33 +20,24 @@ class DeepLabV3PlusV2(SegBaseModel):
     def __init__(self):
         super(DeepLabV3PlusV2, self).__init__()
         if 'res' in self.backbone:
-            c1_channels = 256
-            c3_channels = 1024
-            c4_channels = 2048
+            c1_channels, c3_channels, c4_channels = 256, 1024, 2048
         elif 'shuffle' in self.backbone:
-            c1_channels = 68
-            c3_channels = 336
-            c4_channels = 1280
+            c1_channels, c3_channels, c4_channels = 68, 336, 1280
         elif self.backbone == 'ofa_1080ti_gpu64_27ms':
-            c1_channels = 32
-            c3_channels = 128
-            c4_channels = 1664
+            c1_channels, c3_channels, c4_channels = 32, 128, 1664
         elif self.backbone == 'tiny_ofa_1080ti_gpu64_27ms' or self.backbone == 'ibn_tiny_ofa_1080ti_gpu64_27ms':
-            c1_channels = 32
-            c3_channels = 128
-            c4_channels = 416
+            c1_channels, c3_channels, c4_channels = 32, 128, 416
         elif self.backbone == 'ofa_note10_lat_8ms' or self.backbone == 'ibn_ofa_note10_lat_8ms':
-            c1_channels = 24
-            c3_channels = 112
-            c4_channels = 160
+            c1_channels, c3_channels, c4_channels = 24, 112, 160
         elif self.backbone == 'ofa_v100_gpu64_6ms' or self.backbone == 'ibn_ofa_v100_gpu64_6ms':
-            c1_channels = 32
-            c3_channels = 128
-            c4_channels = 248
+            c1_channels, c3_channels, c4_channels = 32, 128, 248
         elif self.backbone == 'ofa_flops_595m' or self.backbone == 'ibn_ofa_flops_595m':
-            c1_channels = 32
-            c3_channels = 136
-            c4_channels = 192
+            c1_channels, c3_channels, c4_channels = 32, 136, 192
+        elif self.backbone == 'vovnet19_slim' or self.backbone == 'vovnet19_slim_dw':
+            c1_channels, c3_channels, c4_channels = 112, 384, 512
+        elif self.backbone == 'vovnet19' or self.backbone == 'vovnet19_dw':
+            c1_channels, c3_channels, c4_channels = 256, 768, 1024
+
         datasetA_nclass = 8
         datasetC_nclass = 14
         self.head = _DeepLabHead(datasetA_nclass, c1_channels=c1_channels, c4_channels=c4_channels)

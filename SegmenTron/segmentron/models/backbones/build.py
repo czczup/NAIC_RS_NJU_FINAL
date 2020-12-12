@@ -88,6 +88,8 @@ def load_checkpoint(model, filename, map_location=None, strict=False, logger=Non
         translater.close()
         old2new = {item[1]:item[0] for item in content}
         state_dict = {old2new[k]:v for k, v in state_dict.items() if k in old2new}
+    elif "vovnet" in filename.lower():
+        state_dict = {k.replace("bottom_up.", "").replace("backbone.", ""): v for k, v in state_dict.items()}
     else:
         if list(state_dict.keys())[0].startswith('module.'):
             state_dict = {k[7:]: v for k, v in checkpoint['state_dict'].items()}
