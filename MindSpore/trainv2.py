@@ -72,7 +72,7 @@ def parse_args():
     parser.add_argument('--base_lr', type=float, default=0.015, help='base learning rate')
     parser.add_argument('--lr_decay_step', type=int, default=40000, help='learning rate decay step')
     parser.add_argument('--lr_decay_rate', type=float, default=0.1, help='learning rate decay rate')
-    parser.add_argument('--loss_scale', type=float, default=3072.0, help='loss scale')
+    parser.add_argument('--loss_scale', type=float, default=1.0, help='loss scale')
 
     # model
     parser.add_argument('--model', type=str, default='deeplabv3plus', help='select model')
@@ -163,10 +163,10 @@ def train():
                                                 total_train_steps, staircase=True)
     else:
         raise ValueError('unknown learning rate type')
-    # opt = nn.SGD(params=train_net.trainable_params(), learning_rate=lr_iter,
-    #              momentum=0.9, weight_decay=1e-4)
-    opt = nn.Momentum(params=train_net.trainable_params(), learning_rate=lr_iter, momentum=0.9, weight_decay=0.0001,
-                      loss_scale=args.loss_scale)
+    opt = nn.SGD(params=train_net.trainable_params(), learning_rate=lr_iter,
+                 momentum=0.9, weight_decay=1e-4)
+    # opt = nn.Momentum(params=train_net.trainable_params(), learning_rate=lr_iter, momentum=0.9, weight_decay=0.0001,
+    #                   loss_scale=args.loss_scale)
 
     # loss scale
     manager_loss_scale = FixedLossScaleManager(args.loss_scale, drop_overflow_update=False)

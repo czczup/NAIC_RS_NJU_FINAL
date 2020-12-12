@@ -66,7 +66,6 @@ class MobileNetV3(MyNetwork):
         x = self.first_conv(x)
         for index, block in enumerate(self.blocks):
             x = block(x)
-            print(x.shape, index)
             if index == 3 or index == 7 or index == 15:
                 outs.append(x)
         outs.append(x)
