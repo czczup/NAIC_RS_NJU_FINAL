@@ -59,13 +59,17 @@ class ConvLayer(nn.Cell):
         self.dilation = dilation
         self.groups = groups
         self.bias = bias
+        
         self.conv = nn.Conv2d(
-            self.in_channels, self.out_channels, kernel_size=self.kernel_size, stride=self.stride, pad_mode='same',
+            self.in_channels, self.out_channels, kernel_size=self.kernel_size, stride=self.stride, pad_mode='valid',
             dilation=self.dilation, group=self.groups, has_bias=self.bias, weight_init='he_uniform')
+        
         self.bn = nn.BatchNorm2d(self.out_channels, use_batch_statistics=None, eps=1e-3)
         self.act = build_activation(act_func)
+        self.pad = nn.Pad(paddings=((0, 0), (0, 0), (1, 0),(1, 0)), mode="CONSTANT")
 
     def construct(self, x):
+        x = self.pad(x)
         x = self.conv(x)
         x = self.bn(x)
         if self.act is not None:
@@ -108,14 +112,26 @@ class MBInvertedConvLayer(nn.Cell):
                 ('bn', nn.BatchNorm2d(feature_dim, use_batch_statistics=use_batch_statistics, eps=1e-3)),
                 ('act', build_activation(self.act_func)),
             ]))
-
-        depth_conv_modules = [
-            ('conv', nn.Conv2d(feature_dim, feature_dim, kernel_size, stride, pad_mode='same',
-                               group=feature_dim, has_bias=False, dilation=dilation, weight_init='he_uniform')),
-            ('bn', nn.BatchNorm2d(feature_dim, use_batch_statistics=use_batch_statistics, eps=1e-3)),
-            ('act', build_activation(self.act_func))
-        ]
         
+        if self.stride == 2:
+            depth_conv_modules = [
+                ('conv', nn.Conv2d(feature_dim, feature_dim, kernel_size, stride, pad_mode='valid',
+                                   group=feature_dim, has_bias=False, dilation=dilation, weight_init='he_uniform')),
+                ('bn', nn.BatchNorm2d(feature_dim, use_batch_statistics=use_batch_statistics, eps=1e-3)),
+                ('act', build_activation(self.act_func))
+            ]
+        else:
+            depth_conv_modules = [
+                ('conv', nn.Conv2d(feature_dim, feature_dim, kernel_size, stride, pad_mode='same',
+                                   group=feature_dim, has_bias=False, dilation=dilation, weight_init='he_uniform')),
+                ('bn', nn.BatchNorm2d(feature_dim, use_batch_statistics=use_batch_statistics, eps=1e-3)),
+                ('act', build_activation(self.act_func))
+            ]
+        if self.kernel_size == 3:
+            self.pad = nn.Pad(paddings=((0, 0), (0, 0), (1, 0), (1, 0)), mode="CONSTANT")
+        elif self.kernel_size == 5:
+            self.pad = nn.Pad(paddings=((0, 0), (0, 0), (2, 1), (2, 1)), mode="CONSTANT")
+
         self.depth_conv = nn.SequentialCell(OrderedDict(depth_conv_modules))
 
         self.point_linear = nn.SequentialCell(OrderedDict([
@@ -126,6 +142,8 @@ class MBInvertedConvLayer(nn.Cell):
     def construct(self, x):
         if self.inverted_bottleneck:
             x = self.inverted_bottleneck(x)
+        if self.stride == 2:
+            x = self.pad(x)
         x = self.depth_conv(x)
         x = self.point_linear(x)
         return x

@@ -124,7 +124,7 @@ def train():
     network = net_factory.nets_map[args.model]('train', [8, 14], 8, args.aux)
 
     p2m = open("runs/checkpoints/pytorch2mindspore.csv", "r+")
-    p2m = [line[:-1].split(",") for line in p2m.readlines()]
+    p2m = [line.replace("\n", "").split(",") for line in p2m.readlines()]
     p2m = {item[0]: item[1] for item in p2m}
 
     

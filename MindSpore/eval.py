@@ -26,6 +26,10 @@ from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from src.nets import net_factory
 from PIL import Image
 from mindspore.train.serialization import save_checkpoint
+try:
+    import torch
+except:
+    pass
 
 device = "GPU"
 context.set_context(mode=context.GRAPH_MODE, device_target=device, save_graphs=False,
@@ -135,19 +139,15 @@ def transform_mask(mask):
 def net_eval():
     args = parse_args()
     print(args)
-    # data list
     with open(args.data_lst) as f:
         img_lst = f.readlines()
-
-    # network
-    print(args.freeze_bn)
     network = net_factory.nets_map[args.model]('eval', args.num_classes, 8, False, args.freeze_bn, args.mode)
     eval_net = network
-
+    
+    """ load from .pth file """
     # p2m = open("runs/checkpoints/pytorch2mindspore.csv", "r+")
-    # p2m = [line[:-1].split(",") for line in p2m.readlines()]
+    # p2m = [line.replace("\n", "").split(",") for line in p2m.readlines()]
     # p2m = {item[0]:item[1] for item in p2m}
-    #
     # state_dict = torch.load(args.pth_path)
     # param_dict = dict()
     # for k, v in state_dict.items():
@@ -156,7 +156,10 @@ def net_eval():
     #         parameter = Parameter(Tensor(parameter), name=p2m[k])
     #         param_dict[p2m[k]] = parameter
     # load_param_into_net(eval_net, param_dict)
-
+    # save_checkpoint(eval_net, "runs/checkpoints/0046.ckpt")
+    # eval_net.set_train(False)
+    
+    """ load from .ckpt file """
     param_dict = load_checkpoint(args.ckpt_path)
     if device == "Ascend":
         new_param_dict = {}
@@ -166,7 +169,6 @@ def net_eval():
             else:
                 new_param_dict[k] = v
         param_dict = new_param_dict
-        
     load_param_into_net(eval_net, param_dict)
     eval_net.set_train(False)
     
@@ -180,8 +182,8 @@ def net_eval():
     # print(image.shape)
     # image = Tensor(image, mstype.float32)
     #
-    # # batch_img = np.ones((1, 3, 257, 257), dtype=np.float32)
-    # net_out = eval_net(image)
+    # batch_img = Tensor(np.ones((1, 3, 256, 256), dtype=np.float32), mstype.float32)
+    # net_out = eval_net(batch_img)
     # net_out = net_out.asnumpy()[0][0]
     # print(net_out)
     # print(net_out[...,37:43,37:43])
