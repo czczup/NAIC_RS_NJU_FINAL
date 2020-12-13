@@ -136,7 +136,7 @@ def train():
     if args.ckpt_pre_trained:
         param_dict = load_checkpoint(args.ckpt_pre_trained)
         load_param_into_net(train_net, param_dict)
-
+    
     # optimizer
     iters_per_epoch = dataset.get_dataset_size()
     total_train_steps = iters_per_epoch * args.train_epochs

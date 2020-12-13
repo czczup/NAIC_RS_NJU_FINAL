@@ -17,7 +17,6 @@
 import os
 import argparse
 import numpy as np
-import cv2
 from mindspore import Tensor, Parameter
 import mindspore.common.dtype as mstype
 import mindspore.ops as P
@@ -25,9 +24,11 @@ import mindspore.nn as nn
 from mindspore import context
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from src.nets import net_factory
-import torch
 from PIL import Image
-context.set_context(mode=context.GRAPH_MODE, device_target="GPU", save_graphs=False,
+from mindspore.train.serialization import save_checkpoint
+
+device = "GPU"
+context.set_context(mode=context.GRAPH_MODE, device_target=device, save_graphs=False,
                     device_id=int(os.getenv('DEVICE_ID')))
 
 
@@ -91,7 +92,7 @@ def eval_batch(args, eval_net, img_lst, crop_size=256):
         probs_ = net_out[bs].transpose((1, 2, 0))
         # probs_ = Image.fromarray(probs_)
         # probs_ = probs_.resize((args.crop_size, args.crop_size), Image.BILINEAR)
-        probs_ = cv2.resize(probs_, (args.crop_size, args.crop_size))
+        # probs_ = cv2.resize(probs_, (args.crop_size, args.crop_size))
         result_lst.append(probs_)
 
     return result_lst
@@ -143,20 +144,32 @@ def net_eval():
     network = net_factory.nets_map[args.model]('eval', args.num_classes, 8, False, args.freeze_bn, args.mode)
     eval_net = network
 
-    p2m = open("runs/checkpoints/pytorch2mindspore.csv", "r+")
-    p2m = [line[:-1].split(",") for line in p2m.readlines()]
-    p2m = {item[0]:item[1] for item in p2m}
+    # p2m = open("runs/checkpoints/pytorch2mindspore.csv", "r+")
+    # p2m = [line[:-1].split(",") for line in p2m.readlines()]
+    # p2m = {item[0]:item[1] for item in p2m}
+    #
+    # state_dict = torch.load(args.pth_path)
+    # param_dict = dict()
+    # for k, v in state_dict.items():
+    #     if k in p2m:
+    #         parameter = v.cpu().data.numpy()
+    #         parameter = Parameter(Tensor(parameter), name=p2m[k])
+    #         param_dict[p2m[k]] = parameter
+    # load_param_into_net(eval_net, param_dict)
 
-    state_dict = torch.load(args.pth_path)
-    param_dict = dict()
-    for k, v in state_dict.items():
-        if k in p2m:
-            parameter = v.cpu().data.numpy()
-            parameter = Parameter(Tensor(parameter), name=p2m[k])
-            param_dict[p2m[k]] = parameter
+    param_dict = load_checkpoint(args.ckpt_path)
+    if device == "Ascend":
+        new_param_dict = {}
+        for k, v in param_dict.items():
+            if "depth_conv.conv" in k or "depthwise.weight" in k:
+                new_param_dict[k] = Parameter(Tensor(v.asnumpy().transpose(1, 0, 2, 3)), name=k)
+            else:
+                new_param_dict[k] = v
+        param_dict = new_param_dict
+        
     load_param_into_net(eval_net, param_dict)
     eval_net.set_train(False)
-
+    
     # image_mean = np.array([0.485, 0.456, 0.406])
     # image_std = np.array([0.229, 0.224, 0.225])
     # image = Image.open("0.tif")

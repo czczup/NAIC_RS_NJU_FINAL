@@ -14,7 +14,7 @@
 # limitations under the License.
 # ============================================================================
 
-export DEVICE_ID=3
+export DEVICE_ID=0
 export SLOG_PRINT_TO_STDOUT=0
 
 
@@ -26,6 +26,7 @@ python eval.py --data_root="datasets/naicrs/datasetA/trainval"  \
                --model=deeplabv3plusv2  \
                --scales=1.0  \
                --pth_path="runs/checkpoints/0046.pth"  \
+               --ckpt_path="runs/checkpoints/0046.ckpt"  \
                --freeze_bn  \
                --mode="03"
 
