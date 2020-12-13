@@ -190,9 +190,9 @@ class ProxylessNASNets(nn.Cell):
     def construct(self, x):
         x = self.first_conv(x) # 40
         x = self.block0(x) # 24
-        c1 = self.block1(x) # 32
-        x = self.block2(c1) # 32
-        x = self.block3(x) # 56
+        x = self.block1(x) # 32
+        c1 = self.block2(x) # 32
+        x = self.block3(c1) # 56
         c2 = self.block4(x)
         x = self.block5(c2)
         x = self.block6(x)

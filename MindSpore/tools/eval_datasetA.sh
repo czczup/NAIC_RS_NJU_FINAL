@@ -14,14 +14,14 @@
 # limitations under the License.
 # ============================================================================
 
-export DEVICE_ID=5
+export DEVICE_ID=3
 export SLOG_PRINT_TO_STDOUT=0
 
 
 python eval.py --data_root="datasets/naicrs/datasetA/trainval"  \
                --data_lst="datasets/naicrs/txt/valA.txt"  \
                --batch_size=32  \
-               --crop_size=265  \
+               --crop_size=257  \
                --num_classes=8  \
                --model=deeplabv3plusv2  \
                --scales=1.0  \

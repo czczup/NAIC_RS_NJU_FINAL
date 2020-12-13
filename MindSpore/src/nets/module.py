@@ -78,7 +78,7 @@ class ASPP(nn.Cell):
         x = self.conv(x)
         x = self.bn(x)
         x = self.relu(x)
-        x = self.dropout(x)
+        # x = self.dropout(x)
         return x
 
 

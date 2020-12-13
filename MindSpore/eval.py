@@ -62,59 +62,36 @@ def cal_hist(a, b, n):
     return np.bincount(n * a[k].astype(np.int32) + b[k], minlength=n ** 2).reshape(n, n)
 
 
-def resize_long(img, long_size=513):
-    h, w, _ = img.shape
-    if h > w:
-        new_h = long_size
-        new_w = int(1.0 * long_size * w / h)
-    else:
-        new_w = long_size
-        new_h = int(1.0 * long_size * h / w)
-    imo = cv2.resize(img, (new_w, new_h))
-    return imo
 
 
-
-def pre_process(args, img_, crop_size=513):
-    # resize
-    img_ = resize_long(img_, crop_size)
-    resize_h, resize_w, _ = img_.shape
-
+def pre_process(args, img_):
     # mean, std
     image_mean = np.array(args.image_mean)
     image_std = np.array(args.image_std)
     img_ = img_ / 255.0
     img_ = (img_ - image_mean) / image_std
-
-    # pad to crop_size
-    pad_h = crop_size - img_.shape[0]
-    pad_w = crop_size - img_.shape[1]
-    if pad_h > 0 or pad_w > 0:
-        img_ = cv2.copyMakeBorder(img_, 0, pad_h, 0, pad_w, cv2.BORDER_CONSTANT, value=0)
-
     # hwc to chw
     img_ = img_.transpose((2, 0, 1))
-    return img_, resize_h, resize_w
+    return img_
 
 
 def eval_batch(args, eval_net, img_lst, crop_size=256):
     result_lst = []
     batch_size = len(img_lst)
     batch_img = np.zeros((args.batch_size, 3, crop_size, crop_size), dtype=np.float32)
-    resize_hw = []
     for l in range(batch_size):
         img_ = img_lst[l]
-        img_, resize_h, resize_w = pre_process(args, img_, crop_size)
+        img_ = pre_process(args, img_)
         batch_img[l] = img_
-        resize_hw.append([resize_h, resize_w])
+
     batch_img = np.ascontiguousarray(batch_img)
     net_out = eval_net(Tensor(batch_img, mstype.float32))
     net_out = net_out.asnumpy()
-
     for bs in range(batch_size):
-        probs_ = net_out[bs][:, :resize_hw[bs][0], :resize_hw[bs][1]].transpose((1, 2, 0))
-        ori_h, ori_w = img_lst[bs].shape[0], img_lst[bs].shape[1]
-        probs_ = cv2.resize(probs_, (ori_w, ori_h))
+        probs_ = net_out[bs].transpose((1, 2, 0))
+        # probs_ = Image.fromarray(probs_)
+        # probs_ = probs_.resize((args.crop_size, args.crop_size), Image.BILINEAR)
+        probs_ = cv2.resize(probs_, (args.crop_size, args.crop_size))
         result_lst.append(probs_)
 
     return result_lst
@@ -180,6 +157,24 @@ def net_eval():
     load_param_into_net(eval_net, param_dict)
     eval_net.set_train(False)
 
+    # image_mean = np.array([0.485, 0.456, 0.406])
+    # image_std = np.array([0.229, 0.224, 0.225])
+    # image = Image.open("0.tif")
+    # image = image.resize((257, 257))
+    # image = np.array(image) / 255.0
+    # image = (image - image_mean) / image_std
+    # image = np.array([image.transpose((2, 0, 1))])
+    # print(image.shape)
+    # image = Tensor(image, mstype.float32)
+    #
+    # # batch_img = np.ones((1, 3, 257, 257), dtype=np.float32)
+    # net_out = eval_net(image)
+    # net_out = net_out.asnumpy()[0][0]
+    # print(net_out)
+    # print(net_out[...,37:43,37:43])
+    # print(net_out.shape)
+    # exit(0)
+
     hist = np.zeros((args.num_classes, args.num_classes))
     batch_img_lst = []
     batch_msk_lst = []
@@ -191,7 +186,9 @@ def net_eval():
         msk_path = os.path.join(args.data_root, msk_path)
         basename = os.path.basename(msk_path)
         img_ = Image.open(img_path)
+        img_ = img_.resize((args.crop_size, args.crop_size), Image.BILINEAR)
         msk_ = Image.open(msk_path)
+        msk_ = msk_.resize((args.crop_size, args.crop_size), Image.NEAREST)
         img_ = np.array(img_)
         msk_ = np.array(msk_, dtype=np.int32)
         if "datasetA" in msk_path:
@@ -208,7 +205,7 @@ def net_eval():
         if bi == args.batch_size:
             batch_res = eval_batch_scales(args, eval_net, batch_img_lst, scales=args.scales,
                                           base_crop_size=args.crop_size)
-            res = batch_res[0]
+
             for mi in range(args.batch_size):
                 hist += cal_hist(batch_msk_lst[mi].flatten(), batch_res[mi].flatten(), args.num_classes)
 
@@ -221,8 +218,6 @@ def net_eval():
     if bi > 0:
         batch_res = eval_batch_scales(args, eval_net, batch_img_lst, scales=args.scales,
                                       base_crop_size=args.crop_size)
-        res = batch_res[0]
-        cv2.imwrite(basename.split(".")[0]+"_.png", res)
         for mi in range(bi):
             hist += cal_hist(batch_msk_lst[mi].flatten(), batch_res[mi].flatten(), args.num_classes)
         print('processed {} images'.format(image_num + 1))

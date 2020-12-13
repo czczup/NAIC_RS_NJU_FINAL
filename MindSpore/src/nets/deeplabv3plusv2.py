@@ -82,14 +82,15 @@ class DeepLabV3PlusV2(nn.Cell):
         c1, _, c3, c4 = self.encoder(x)
         
         x1 = self.head(c4, c1)
-        x1 = P.ResizeNearestNeighbor((size[2], size[3]), True)(x1)
+        # x1 = P.ResizeNearestNeighbor((size[2], size[3]), True)(x1)
         x1 = self._softmax(x1)
         x1 = self.split_v2(x1)
 
         x2 = self.head2(c4, c1)
-        x2 = P.ResizeNearestNeighbor((size[2], size[3]), True)(x2)
+        # x2 = P.ResizeNearestNeighbor((size[2], size[3]), True)(x2)
         x2 = self._softmax(x2)
         x = self.add(x1, x2)
+        x = P.ResizeNearestNeighbor((size[2], size[3]), True)(x)
         return x
 
     def construct_8_14_to_8(self, x):
@@ -97,14 +98,13 @@ class DeepLabV3PlusV2(nn.Cell):
         c1, _, c3, c4 = self.encoder(x)
 
         x1 = self.head(c4, c1)
-        x1 = P.ResizeNearestNeighbor((size[2], size[3]), True)(x1)
         x1 = self._softmax(x1)
 
         x2 = self.head2(c4, c1)
-        x2 = P.ResizeNearestNeighbor((size[2], size[3]), True)(x2)
         x2 = self._softmax(x2)
         x2 = self._merge(x2)
         x = self.add(x1, x2)
+        # x = P.ResizeNearestNeighbor((size[2], size[3]), True)(x)
         return x
     
     def construct_8_to_8(self, x):
@@ -170,8 +170,9 @@ class DeepLabHead(nn.Cell):
     def construct(self, x, c1):
         size = self.shape(c1)
         x = self.aspp(x)
-        x = P.ResizeNearestNeighbor((size[2], size[3]), True)(x)
+        x = P.ResizeNearestNeighbor((size[2], size[3]), False)(x)
         c1 = self.c1_block(c1)
-
-        return self.block(self.concat((x, c1)))
-
+        cat = self.concat((x, c1))
+        # #
+        return self.block(cat)
+        # return cat
