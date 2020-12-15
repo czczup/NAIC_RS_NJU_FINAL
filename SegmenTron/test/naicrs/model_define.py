@@ -1,6 +1,7 @@
 import torch
 from deeplabv3plus import DeepLabV3Plus
 from dunet import DUNet
+from resnext import resnext50_32x4d, resnext101_32x8d
 from ibn_resnet import ibn_resnet50
 from ibn_resnext import ibn_b_resnext50_32x4d
 from resnext import resnext50_32x4d
@@ -29,9 +30,10 @@ def init_model(args):
     # model = DeepLabV3Plus(nclass=[8,14], get_backbone=ofa_note10_lat_8ms, channels=[24, 160])
     # model = DeepLabV3Plus(nclass=[8,14], get_backbone=resnext50_32x4d, channels=[256, 2048])
     # model = DeepLabV3Plus(nclass=[8,14], get_backbone=tiny_ofa_1080ti_gpu64_27ms, channels=[32, 416])
-    model = DeepLabV3Plus(nclass=[8,14], get_backbone=ofa_v100_gpu64_6ms, channels=[32, 248])
+    # model = DeepLabV3Plus(nclass=[8,14], get_backbone=ofa_v100_gpu64_6ms, channels=[32, 248])
     # model = DeepLabV3PlusNearest(nclass=[8,14], get_backbone=ofa_v100_gpu64_6ms, channels=[32, 248])
     # model = DeepLabV3Plus(nclass=[8,14], get_backbone=vovnet19_dw, channels=[256, 1024])
+    model = DeepLabV3PlusNearest(nclass=[8,14], get_backbone=resnext101_32x8d, channels=[256, 2048])
 
     model_path = "../model/%s" % args.model
     print('load test model from {}'.format(model_path))

@@ -7,4 +7,4 @@ GPUS=$2
 export NCCL_LL_THRESHOLD=0
 
 $PYTHON -m torch.distributed.launch --nproc_per_node=$GPUS \
-    $(dirname "$0")/trainv2.py --config-file $CONFIG --launcher pytorch ${@:3}
+    $(dirname "$0")/trainv2.py --config-file $CONFIG --launcher pytorch --val-epoch 20 ${@:3}

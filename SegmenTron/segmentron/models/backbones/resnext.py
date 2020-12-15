@@ -59,7 +59,7 @@ class ResNext(nn.Module):
     def __init__(self, block, layers, num_classes=1000, zero_init_residual=False, groups=1,
                  width_per_group=64, norm_layer=nn.BatchNorm2d):
         super(ResNext, self).__init__()
-        output_stride = cfg.MODEL.OUTPUT_STRIDE
+        output_stride = 8
         scale = cfg.MODEL.BACKBONE_SCALE
         if output_stride == 32:
             dilations = [1, 1]
@@ -129,7 +129,7 @@ class ResNext(nn.Module):
         x = self.bn1(x)
         x = self.relu(x)
         x = self.maxpool(x)
-
+        
         c1 = self.layer1(x)
         c2 = self.layer2(c1)
         c3 = self.layer3(c2)
@@ -148,3 +148,4 @@ def resnext50_32x4d(norm_layer=nn.BatchNorm2d):
 def resnext101_32x8d(norm_layer=nn.BatchNorm2d):
     return ResNext(Bottleneck, [3, 4, 23, 3], groups=32,
                    width_per_group=8, norm_layer=norm_layer)
+

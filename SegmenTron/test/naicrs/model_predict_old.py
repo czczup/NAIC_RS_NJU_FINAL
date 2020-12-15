@@ -141,10 +141,10 @@ def multi_scale_predict(model, image, filename, output_dir, args):
     
     origin_width, origin_height = image.size(2), image.size(3)
     output1 = single_scale_predict_v2(scale1, image, model, mode=args.mode)
-    output2 = single_scale_predict_v2(scale2, image, model, mode=args.mode)
-    output2 = F.interpolate(output2, (output1.size(2), output1.size(3)), mode='bilinear', align_corners=True)
-    output = output1 + output2
-
+    # output2 = single_scale_predict_v2(scale2, image, model, mode=args.mode)
+    # output2 = F.interpolate(output2, (output1.size(2), output1.size(3)), mode='bilinear', align_corners=True)
+    # output = output1 + output2
+    output = output1
     output = F.interpolate(output, (origin_width, origin_height), mode='bilinear', align_corners=True)
     
     predict = torch.argmax(output, dim=1).squeeze(0)

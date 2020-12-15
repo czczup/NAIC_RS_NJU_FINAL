@@ -32,3 +32,4 @@ from .dunetv2 import DUNetV2
 from .deeplabv3_plus_v2_teacher import DeepLabV3PlusV2Teacher
 from .deeplabv3_plus_v2_student import DeepLabV3PlusV2Student
 from .deeplabv3_plus_v2_nearest import DeepLabV3PlusV2Nearest
+from .dunetv2_nearest import DUNetV2Nearest

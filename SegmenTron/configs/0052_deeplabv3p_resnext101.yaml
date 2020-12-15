@@ -8,7 +8,7 @@ TRAIN:
     CROP_SIZE: 256
     BASE_SIZE: 256
     SUPERVISE_SIZE: 256
-    BACKBONE_PRETRAINED_PATH: "pretrain/resnext101_32x8d-8ba56ff5.pth"
+    BACKBONE_PRETRAINED_PATH: "pretrain/0052_resnext101_32x8d-8ba56ff5.pth"
 TEST:
     BATCH_SIZE: 32
     SCALES: [0.75, 1.0, 1.25]
