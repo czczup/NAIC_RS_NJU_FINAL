@@ -2,17 +2,15 @@ import os
 import sys
 
 cur_path = os.path.abspath(os.path.dirname(__file__))
-root_path = os.path.split(os.path.split(cur_path)[0])[0]
+root_path = os.path.split(cur_path)[0]
 sys.path.append(root_path)
 
 from mindspore import context
-from mindspore.train.serialization import save_checkpoint, load_checkpoint, load_param_into_net
-from src.nets.backbones.resnext import resnext50_32x4d as ms_resnext50
+from mindspore.train.serialization import save_checkpoint, load_param_into_net
 from src.nets.backbones.resnext import resnext101_32x8d as ms_resnext101
-from segmentron.models.backbones.resnext import resnext50_32x4d as pt_resnext50
 from segmentron.models.backbones.resnext import resnext101_32x8d as pt_resnext101
 from src.nets.deeplabv3plusv2 import DeepLabV3PlusV2 as Ms_DeepLabV3PlusV2
-from src.nets.pytorch_deeplabv3plus import DeepLabV3PlusNearest as Pt_DeepLabV3PlusV2
+from src.pytorch.deeplabv3plus import DeepLabV3PlusNearest as Pt_DeepLabV3PlusV2
 from mindspore import Tensor, Parameter
 import mindspore.common.dtype as mstype
 import torch
@@ -66,7 +64,7 @@ def key_mapping(key):
 
 if __name__ == '__main__':
     context.set_context(mode=context.GRAPH_MODE, device_target="GPU", save_graphs=False, device_id=0)
-    ms_model = Ms_DeepLabV3PlusV2(phase="val", num_classes=[8, 14], output_stride=8, aux=False, freeze_bn=True,
+    ms_model = Ms_DeepLabV3PlusV2(phase="val", num_classes=[8, 14], aux=False,
                                   mode="03", get_backbone=ms_resnext101)
     # save_checkpoint(ms_model, "resnext101_deeplabv3plus.ckpt")
     # param_dict = load_checkpoint("resnext101_deeplabv3plus.ckpt")

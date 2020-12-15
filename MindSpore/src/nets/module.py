@@ -6,11 +6,11 @@ from collections import OrderedDict
 
 class ConvBNReLU(nn.Cell):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0,
-                 dilation=1, group=1, use_batch_statistics=True):
+                 dilation=1, group=1):
         super(ConvBNReLU, self).__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding=padding,
                               dilation=dilation, group=group, has_bias=False)
-        self.bn = nn.BatchNorm2d(out_channels, use_batch_statistics=use_batch_statistics)
+        self.bn = nn.BatchNorm2d(out_channels)
         self.relu = nn.ReLU()
     
     def construct(self, x):
@@ -21,7 +21,7 @@ class ConvBNReLU(nn.Cell):
 
 
 class ASPP(nn.Cell):
-    def __init__(self, in_channels, out_channels, output_stride=8, use_batch_statistics=True):
+    def __init__(self, in_channels, out_channels, output_stride=8):
         super(ASPP, self).__init__()
         
         if output_stride == 16:
@@ -35,24 +35,21 @@ class ASPP(nn.Cell):
         
         self.aspp0 = nn.SequentialCell([
             nn.Conv2d(in_channels, out_channels, kernel_size=1, has_bias=False, weight_init='he_uniform'),
-            nn.BatchNorm2d(out_channels, use_batch_statistics=use_batch_statistics),
+            nn.BatchNorm2d(out_channels),
             nn.ReLU()
         ])
-        self.aspp1 = SeparableConv2d(in_channels, out_channels, dilation=dilations[0],
-                                     use_batch_statistics=use_batch_statistics)
-        self.aspp2 = SeparableConv2d(in_channels, out_channels, dilation=dilations[1],
-                                     use_batch_statistics=use_batch_statistics)
-        self.aspp3 = SeparableConv2d(in_channels, out_channels, dilation=dilations[2],
-                                     use_batch_statistics=use_batch_statistics)
+        self.aspp1 = SeparableConv2d(in_channels, out_channels, dilation=dilations[0])
+        self.aspp2 = SeparableConv2d(in_channels, out_channels, dilation=dilations[1])
+        self.aspp3 = SeparableConv2d(in_channels, out_channels, dilation=dilations[2])
         
         self.image_pooling = nn.SequentialCell([
             nn.Conv2d(in_channels, out_channels, kernel_size=1, weight_init='he_uniform'),
-            nn.BatchNorm2d(out_channels, use_batch_statistics=use_batch_statistics),
+            nn.BatchNorm2d(out_channels),
             nn.ReLU()
         ])
         
         self.conv = nn.Conv2d(out_channels * 5, out_channels, kernel_size=1, weight_init='he_uniform')
-        self.bn = nn.BatchNorm2d(out_channels, use_batch_statistics=use_batch_statistics)
+        self.bn = nn.BatchNorm2d(out_channels)
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(0.1)
         
@@ -63,7 +60,7 @@ class ASPP(nn.Cell):
         size = self.shape(x)
         pool = nn.AvgPool2d(size[2])(x)
         pool = self.image_pooling(pool)
-        pool = P.ResizeNearestNeighbor((size[2], size[3]), True)(pool)  # TODO: bilinear
+        pool = P.ResizeNearestNeighbor((size[2], size[3]), True)(pool)
         
         x0 = self.aspp0(x)
         x1 = self.aspp1(x)
@@ -83,15 +80,14 @@ class ASPP(nn.Cell):
 
 
 class SeparableConv2d(nn.Cell):
-    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, dilation=1, has_bias=False,
-                 use_batch_statistics=True):
+    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, dilation=1, has_bias=False):
         super().__init__()
         depthwise = nn.Conv2d(in_channels, in_channels, kernel_size,
                               stride=stride, pad_mode="same",
                               dilation=dilation, group=in_channels, has_bias=has_bias)
-        bn_depth = nn.BatchNorm2d(in_channels, use_batch_statistics=use_batch_statistics)
+        bn_depth = nn.BatchNorm2d(in_channels)
         pointwise = nn.Conv2d(in_channels, out_channels, 1, has_bias=has_bias)
-        bn_point = nn.BatchNorm2d(out_channels, use_batch_statistics=use_batch_statistics)
+        bn_point = nn.BatchNorm2d(out_channels)
         
         self.block = nn.SequentialCell(OrderedDict([('depthwise', depthwise),
                                                     ('bn_depth', bn_depth),
@@ -106,12 +102,12 @@ class SeparableConv2d(nn.Cell):
     
     
 class FCNHead(nn.Cell):
-    def __init__(self, in_channels, channels, use_batch_statistics=True):
+    def __init__(self, in_channels, channels):
         super(FCNHead, self).__init__()
         inter_channels = in_channels // 4
         self.block = nn.SequentialCell([
             nn.Conv2d(in_channels, inter_channels, 3, pad_mode='same', has_bias=False),
-            nn.BatchNorm2d(inter_channels, use_batch_statistics=use_batch_statistics),
+            nn.BatchNorm2d(inter_channels),
             nn.ReLU(),
             # nn.Dropout(0.1),
             nn.Conv2d(inter_channels, channels, 1, has_bias=True)

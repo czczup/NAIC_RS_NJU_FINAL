@@ -1,19 +1,22 @@
 import mindspore.nn as nn
 from mindspore.ops import operations as P
 from src.nets.backbones.resnet import Resnet
-from src.nets.backbones.ofav100 import ProxylessNASNets, ofa_v100_gpu64_6ms
+from src.nets.backbones.ofav100 import ProxylessNASNets
+from src.nets.backbones.resnext import ResNext
 from .module import ConvBNReLU, SeparableConv2d, ASPP, FCNHead
 
 
 class DeepLabV3Plus(nn.Cell):
-    def __init__(self, phase='train', num_classes=14, output_stride=8, aux=False):
+    def __init__(self, phase='train', num_classes=14, aux=False, get_backbone=None):
         super(DeepLabV3Plus, self).__init__()
 
         self.aux = aux
         self.training = (phase == 'train')
-        # self.encoder = Resnet(Bottleneck, [3, 4, 23, 3], output_stride=output_stride)
-        self.encoder = ofa_v100_gpu64_6ms()
+        self.encoder = get_backbone()
+
         if isinstance(self.encoder, Resnet):
+            c1_channels, c3_channels, c4_channels = 256, 1024, 2048
+        elif isinstance(self.encoder, ResNext):
             c1_channels, c3_channels, c4_channels = 256, 1024, 2048
         elif isinstance(self.encoder, ProxylessNASNets):
             c1_channels, c3_channels, c4_channels = 32, 128, 248

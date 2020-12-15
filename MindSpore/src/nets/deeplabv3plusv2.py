@@ -6,13 +6,12 @@ from src.nets.backbones.ofav100 import ProxylessNASNets, ofa_v100_gpu64_6ms
 from src.nets.backbones.resnext import resnext101_32x8d, ResNext
 
 class DeepLabV3PlusV2(nn.Cell):
-    def __init__(self, phase='train', num_classes=[8, 14], output_stride=8, aux=False, freeze_bn=False, mode="03",
+    def __init__(self, phase='train', num_classes=[8, 14], aux=False, mode="03",
                  get_backbone=None):
         super(DeepLabV3PlusV2, self).__init__()
         
         self.aux = aux
         self.training = (phase == 'train')
-        use_batch_statistics = not freeze_bn
         
         self.encoder = get_backbone()
         
@@ -24,13 +23,13 @@ class DeepLabV3PlusV2(nn.Cell):
             c1_channels, c3_channels, c4_channels = 32, 128, 248
             
         self.head = DeepLabHead(num_classes=8, c1_channels=c1_channels,
-                                c4_channels=c4_channels, use_batch_statistics=use_batch_statistics)
+                                c4_channels=c4_channels)
         self.head2 = DeepLabHead(num_classes=14, c1_channels=c1_channels,
-                                 c4_channels=c4_channels, use_batch_statistics=use_batch_statistics)
+                                 c4_channels=c4_channels)
         
         if self.aux and self.training:
-            self.auxlayer = FCNHead(c3_channels, num_classes[0], use_batch_statistics=use_batch_statistics)
-            self.auxlayer2 = FCNHead(c3_channels, num_classes[1], use_batch_statistics=use_batch_statistics)
+            self.auxlayer = FCNHead(c3_channels, num_classes[0])
+            self.auxlayer2 = FCNHead(c3_channels, num_classes[1])
         
         self.shape = P.Shape()
         self.add = P.TensorAdd()
@@ -141,7 +140,7 @@ class DeepLabV3PlusV2(nn.Cell):
         elif self.mode == "04":
             return self.construct_14_to_14(x)
         else:
-            return self.construct_8_14_to_14_v2(x)
+            return self.construct_8_14_to_14(x)
 
     def construct(self, x):
         if self.training:
@@ -151,16 +150,15 @@ class DeepLabV3PlusV2(nn.Cell):
 
         
 class DeepLabHead(nn.Cell):
-    def __init__(self, num_classes, c1_channels=256, c4_channels=2048, output_stride=8,
-                 use_batch_statistics=True):
+    def __init__(self, num_classes, c1_channels=256, c4_channels=2048, output_stride=8):
         super(DeepLabHead, self).__init__()
-        self.aspp = ASPP(c4_channels, 256, output_stride, use_batch_statistics=use_batch_statistics)
+        self.aspp = ASPP(c4_channels, 256, output_stride)
         last_channels = 256
-        self.c1_block = ConvBNReLU(c1_channels, 48, 1, use_batch_statistics=use_batch_statistics)
+        self.c1_block = ConvBNReLU(c1_channels, 48, 1)
         last_channels += 48
         self.block = nn.SequentialCell([
-            SeparableConv2d(last_channels, 256, 3, use_batch_statistics=use_batch_statistics),
-            SeparableConv2d(256, 256, 3, use_batch_statistics=use_batch_statistics),
+            SeparableConv2d(last_channels, 256, 3),
+            SeparableConv2d(256, 256, 3),
             nn.Conv2d(256, num_classes, 1, has_bias=True)
         ])
         self.shape = P.Shape()

@@ -54,7 +54,6 @@ def parse_args():
     # model
     parser.add_argument('--model', type=str, default='deeplabv3plusv2', help='select model')
     parser.add_argument('--backbone', type=str, default='resnext101', help='select backbone')
-    parser.add_argument('--freeze_bn', default=True, help='freeze bn')
     parser.add_argument('--pth_path', type=str, default='', help='model to evaluate')
     parser.add_argument('--ckpt_path', type=str, default='', help='model to evaluate')
     parser.add_argument('--mode', type=str, default='03', help='mode to evaluate')
@@ -138,8 +137,7 @@ def net_eval():
     with open(args.data_lst) as f:
         img_lst = f.readlines()
     backbone = net_factory.backbones_map[args.backbone]
-    network = net_factory.nets_map[args.model]('eval', args.num_classes, 8, False, args.freeze_bn,
-                                               args.mode, get_backbone=backbone)
+    network = net_factory.nets_map[args.model]('eval', args.num_classes, aux=False, mode=args.mode, get_backbone=backbone)
     eval_net = network
     
     """ load from .ckpt file """
