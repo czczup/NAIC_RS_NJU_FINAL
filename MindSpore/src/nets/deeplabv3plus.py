@@ -1,7 +1,7 @@
 import mindspore.nn as nn
 from mindspore.ops import operations as P
-from .resnet import Resnet, Bottleneck
-from .ofav100 import ProxylessNASNets, ofa_v100_gpu64_6ms
+from src.nets.backbones.resnet import Resnet
+from src.nets.backbones.ofav100 import ProxylessNASNets, ofa_v100_gpu64_6ms
 from .module import ConvBNReLU, SeparableConv2d, ASPP, FCNHead
 
 

@@ -46,14 +46,15 @@ def parse_args():
     parser.add_argument('--crop_size', type=int, default=256, help='crop size')
     parser.add_argument('--image_mean', type=list, default=[0.485, 0.456, 0.406], help='image mean')
     parser.add_argument('--image_std', type=list, default=[0.229, 0.224, 0.225], help='image std')
-    parser.add_argument('--scales', type=float, action='append', help='scales of evaluation')
+    parser.add_argument('--scales', type=list, default=[1.0], help='scales of evaluation')
     parser.add_argument('--flip', action='store_true', help='perform left-right flip')
     parser.add_argument('--ignore_label', type=int, default=-1, help='ignore label')
-    parser.add_argument('--num_classes', type=int, default=14, help='number of classes')
+    parser.add_argument('--num_classes', type=int, default=8, help='number of classes')
 
     # model
-    parser.add_argument('--model', type=str, default='deeplab_v3_s16', help='select model')
-    parser.add_argument('--freeze_bn', action='store_true', default=False, help='freeze bn')
+    parser.add_argument('--model', type=str, default='deeplabv3plusv2', help='select model')
+    parser.add_argument('--backbone', type=str, default='resnext101', help='select backbone')
+    parser.add_argument('--freeze_bn', default=True, help='freeze bn')
     parser.add_argument('--pth_path', type=str, default='', help='model to evaluate')
     parser.add_argument('--ckpt_path', type=str, default='', help='model to evaluate')
     parser.add_argument('--mode', type=str, default='03', help='mode to evaluate')
@@ -65,8 +66,6 @@ def parse_args():
 def cal_hist(a, b, n):
     k = (a >= 0) & (a < n)
     return np.bincount(n * a[k].astype(np.int32) + b[k], minlength=n ** 2).reshape(n, n)
-
-
 
 
 def pre_process(args, img_):
@@ -94,9 +93,6 @@ def eval_batch(args, eval_net, img_lst, crop_size=256):
     net_out = net_out.asnumpy()
     for bs in range(batch_size):
         probs_ = net_out[bs].transpose((1, 2, 0))
-        # probs_ = Image.fromarray(probs_)
-        # probs_ = probs_.resize((args.crop_size, args.crop_size), Image.BILINEAR)
-        # probs_ = cv2.resize(probs_, (args.crop_size, args.crop_size))
         result_lst.append(probs_)
 
     return result_lst
@@ -141,54 +137,15 @@ def net_eval():
     print(args)
     with open(args.data_lst) as f:
         img_lst = f.readlines()
-    network = net_factory.nets_map[args.model]('eval', args.num_classes, 8, False, args.freeze_bn, args.mode)
+    backbone = net_factory.backbones_map[args.backbone]
+    network = net_factory.nets_map[args.model]('eval', args.num_classes, 8, False, args.freeze_bn,
+                                               args.mode, get_backbone=backbone)
     eval_net = network
-    
-    """ load from .pth file """
-    # p2m = open("runs/checkpoints/pytorch2mindspore.csv", "r+")
-    # p2m = [line.replace("\n", "").split(",") for line in p2m.readlines()]
-    # p2m = {item[0]:item[1] for item in p2m}
-    # state_dict = torch.load(args.pth_path)
-    # param_dict = dict()
-    # for k, v in state_dict.items():
-    #     if k in p2m:
-    #         parameter = v.cpu().data.numpy()
-    #         parameter = Parameter(Tensor(parameter), name=p2m[k])
-    #         param_dict[p2m[k]] = parameter
-    # load_param_into_net(eval_net, param_dict)
-    # save_checkpoint(eval_net, "runs/checkpoints/0046.ckpt")
-    # eval_net.set_train(False)
     
     """ load from .ckpt file """
     param_dict = load_checkpoint(args.ckpt_path)
-    if device == "Ascend":
-        new_param_dict = {}
-        for k, v in param_dict.items():
-            if "depth_conv.conv" in k or "depthwise.weight" in k:
-                new_param_dict[k] = Parameter(Tensor(v.asnumpy().transpose(1, 0, 2, 3)), name=k)
-            else:
-                new_param_dict[k] = v
-        param_dict = new_param_dict
     load_param_into_net(eval_net, param_dict)
     eval_net.set_train(False)
-    
-    # image_mean = np.array([0.485, 0.456, 0.406])
-    # image_std = np.array([0.229, 0.224, 0.225])
-    # image = Image.open("0.tif")
-    # image = image.resize((257, 257))
-    # image = np.array(image) / 255.0
-    # image = (image - image_mean) / image_std
-    # image = np.array([image.transpose((2, 0, 1))])
-    # print(image.shape)
-    # image = Tensor(image, mstype.float32)
-    #
-    # batch_img = Tensor(np.ones((1, 3, 256, 256), dtype=np.float32), mstype.float32)
-    # net_out = eval_net(batch_img)
-    # net_out = net_out.asnumpy()[0][0]
-    # print(net_out)
-    # print(net_out[...,37:43,37:43])
-    # print(net_out.shape)
-    # exit(0)
 
     hist = np.zeros((args.num_classes, args.num_classes))
     batch_img_lst = []
@@ -201,9 +158,9 @@ def net_eval():
         msk_path = os.path.join(args.data_root, msk_path)
         basename = os.path.basename(msk_path)
         img_ = Image.open(img_path)
-        img_ = img_.resize((args.crop_size, args.crop_size), Image.BILINEAR)
+        # img_ = img_.resize((args.crop_size, args.crop_size), Image.BILINEAR)
         msk_ = Image.open(msk_path)
-        msk_ = msk_.resize((args.crop_size, args.crop_size), Image.NEAREST)
+        # msk_ = msk_.resize((args.crop_size, args.crop_size), Image.NEAREST)
         img_ = np.array(img_)
         msk_ = np.array(msk_, dtype=np.int32)
         if "datasetA" in msk_path:

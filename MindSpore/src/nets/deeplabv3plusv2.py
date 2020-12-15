@@ -1,21 +1,24 @@
 import mindspore.nn as nn
 from mindspore.ops import operations as P
-from .resnet import Resnet, Bottleneck
+from src.nets.backbones.resnet import Resnet
 from .module import ASPP, SeparableConv2d, ConvBNReLU, FCNHead
-from .ofav100 import ProxylessNASNets, ofa_v100_gpu64_6ms
-import mindspore.ops as ops
-
+from src.nets.backbones.ofav100 import ProxylessNASNets, ofa_v100_gpu64_6ms
+from src.nets.backbones.resnext import resnext101_32x8d, ResNext
 
 class DeepLabV3PlusV2(nn.Cell):
-    def __init__(self, phase='train', num_classes=[8, 14], output_stride=8, aux=False, freeze_bn=False, mode="03"):
+    def __init__(self, phase='train', num_classes=[8, 14], output_stride=8, aux=False, freeze_bn=False, mode="03",
+                 get_backbone=None):
         super(DeepLabV3PlusV2, self).__init__()
         
         self.aux = aux
         self.training = (phase == 'train')
-        # self.encoder = Resnet(Bottleneck, [3, 4, 23, 3], output_stride=output_stride)
         use_batch_statistics = not freeze_bn
-        self.encoder = ofa_v100_gpu64_6ms(use_batch_statistics)
+        
+        self.encoder = get_backbone()
+        
         if isinstance(self.encoder, Resnet):
+            c1_channels, c3_channels, c4_channels = 256, 1024, 2048
+        elif isinstance(self.encoder, ResNext):
             c1_channels, c3_channels, c4_channels = 256, 1024, 2048
         elif isinstance(self.encoder, ProxylessNASNets):
             c1_channels, c3_channels, c4_channels = 32, 128, 248
@@ -41,20 +44,16 @@ class DeepLabV3PlusV2(nn.Cell):
         c1, _, c3, c4 = self.encoder(x)
 
         x1 = self.head(c4, c1)
-        # x1 = P.ResizeBilinear((size[2], size[3]), True)(x1)
-        x1 = P.ResizeNearestNeighbor((size[2], size[3]), True)(x1)
+        x1 = P.ResizeNearestNeighbor((size[2], size[3]), False)(x1)
         
         auxout1 = self.auxlayer(c3)
-        # auxout1 = P.ResizeBilinear((size[2], size[3]), True)(auxout1)
-        auxout1 = P.ResizeNearestNeighbor((size[2], size[3]), True)(auxout1)
+        auxout1 = P.ResizeNearestNeighbor((size[2], size[3]), False)(auxout1)
 
         x2 = self.head2(c4, c1)
-        # x2 = P.ResizeBilinear((size[2], size[3]), True)(x2)
-        x2 = P.ResizeNearestNeighbor((size[2], size[3]), True)(x2)
+        x2 = P.ResizeNearestNeighbor((size[2], size[3]), False)(x2)
 
         auxout2 = self.auxlayer2(c3)
-        # auxout2 = P.ResizeBilinear((size[2], size[3]), True)(auxout2)
-        auxout2 = P.ResizeNearestNeighbor((size[2], size[3]), True)(auxout2)
+        auxout2 = P.ResizeNearestNeighbor((size[2], size[3]), False)(auxout2)
 
         return x1, auxout1, x2, auxout2
 
@@ -92,31 +91,26 @@ class DeepLabV3PlusV2(nn.Cell):
         x2 = self.head2(c4, c1)
         x2 = self._softmax(x2)
         x = self.add(x1, x2)
-        # x = P.ResizeBilinear((size[2], size[3]), True)(x)
-        x = P.ResizeNearestNeighbor((size[2], size[3]), True)(x)
+        x = P.ResizeNearestNeighbor((size[2], size[3]), False)(x)
         return x
 
     def construct_8_14_to_8(self, x):
         size = self.shape(x)
         c1, _, c3, c4 = self.encoder(x)
-
         x1 = self.head(c4, c1)
         x1 = self._softmax(x1)
-
         x2 = self.head2(c4, c1)
         x2 = self._softmax(x2)
         x2 = self._merge(x2)
         x = self.add(x1, x2)
-        # x = P.ResizeBilinear((size[2], size[3]), True)(x)
-        x = P.ResizeNearestNeighbor((size[2], size[3]), True)(x)
+        x = P.ResizeNearestNeighbor((size[2], size[3]), False)(x)
         return x
     
     def construct_8_to_8(self, x):
         size = self.shape(x)
         c1, _, c3, c4 = self.encoder(x)
         x = self.head(c4, c1)
-        # x = P.ResizeBilinear((size[2], size[3]), True)(x)
-        x = P.ResizeNearestNeighbor((size[2], size[3]), True)(x)
+        x = P.ResizeNearestNeighbor((size[2], size[3]), False)(x)
         x = self._softmax(x)
         return x
     
@@ -124,8 +118,7 @@ class DeepLabV3PlusV2(nn.Cell):
         size = self.shape(x)
         c1, _, c3, c4 = self.encoder(x)
         x2 = self.head2(c4, c1)
-        # x2 = P.ResizeBilinear((size[2], size[3]), True)(x2)
-        x2 = P.ResizeNearestNeighbor((size[2], size[3]), True)(x2)
+        x2 = P.ResizeNearestNeighbor((size[2], size[3]), False)(x2)
         x2 = self._softmax(x2)
         x2 = self._merge(x2)
         return x2
@@ -134,8 +127,7 @@ class DeepLabV3PlusV2(nn.Cell):
         size = self.shape(x)
         c1, _, c3, c4 = self.encoder(x)
         x2 = self.head2(c4, c1)
-        # x2 = P.ResizeBilinear((size[2], size[3]), True)(x2)
-        x2 = P.ResizeNearestNeighbor((size[2], size[3]), True)(x2)
+        x2 = P.ResizeNearestNeighbor((size[2], size[3]), False)(x2)
         x2 = self._softmax(x2)
         return x2
 
@@ -156,7 +148,7 @@ class DeepLabV3PlusV2(nn.Cell):
             return self.train_construct(x)
         else:
             return self.test_construct(x)
-        
+
         
 class DeepLabHead(nn.Cell):
     def __init__(self, num_classes, c1_channels=256, c4_channels=2048, output_stride=8,
@@ -177,7 +169,6 @@ class DeepLabHead(nn.Cell):
     def construct(self, x, c1):
         size = self.shape(c1)
         x = self.aspp(x)
-        # x = P.ResizeBilinear((size[2], size[3]), False)(x)
         x = P.ResizeNearestNeighbor((size[2], size[3]), False)(x)
         c1 = self.c1_block(c1)
         

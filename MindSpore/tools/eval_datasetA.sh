@@ -21,12 +21,5 @@ export SLOG_PRINT_TO_STDOUT=0
 python eval.py --data_root="datasets/naicrs/datasetA/trainval"  \
                --data_lst="datasets/naicrs/txt/valA.txt"  \
                --batch_size=32  \
-               --crop_size=256  \
-               --num_classes=8  \
-               --model=deeplabv3plusv2  \
-               --scales=1.0  \
-               --pth_path="runs/checkpoints/0046.pth"  \
-               --ckpt_path="runs/checkpoints/0046.ckpt"  \
-               --freeze_bn  \
-               --mode="03"
-
+               --backbone=resnext101  \
+               --ckpt_path="runs/checkpoints/resnext101_deeplabv3plus.ckpt"

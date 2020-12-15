@@ -1,13 +1,15 @@
-import torch
 import torch.nn as nn
+import torch.utils.model_zoo as model_zoo
 
 
 class Bottleneck(nn.Module):
     expansion = 4
+
     def __init__(self, inplanes, planes, stride=1, downsample=None, groups=1,
                  base_width=64, dilation=1, norm_layer=None, **kwargs):
         super(Bottleneck, self).__init__()
         width = int(planes * (base_width / 64.)) * groups
+
         self.conv1 = nn.Conv2d(inplanes, width, 1, bias=False)
         self.bn1 = norm_layer(width)
         self.conv2 = nn.Conv2d(width, width, 3, stride, dilation, dilation, groups, bias=False)
@@ -20,26 +22,34 @@ class Bottleneck(nn.Module):
 
     def forward(self, x):
         identity = x
+
         out = self.conv1(x)
         out = self.bn1(out)
         out = self.relu(out)
+
         out = self.conv2(out)
         out = self.bn2(out)
         out = self.relu(out)
+
         out = self.conv3(out)
         out = self.bn3(out)
+
         if self.downsample is not None:
             identity = self.downsample(x)
+
         out += identity
         out = self.relu(out)
+
         return out
 
 
-
 class ResNext(nn.Module):
-    def __init__(self, block, layers, output_stride=8, zero_init_residual=False, groups=1,
+
+    def __init__(self, block, layers, num_classes=1000, zero_init_residual=False, groups=1,
                  width_per_group=64, norm_layer=nn.BatchNorm2d):
         super(ResNext, self).__init__()
+        output_stride = 8
+        scale = 1
         if output_stride == 32:
             dilations = [1, 1]
             strides = [2, 2]
@@ -63,6 +73,7 @@ class ResNext(nn.Module):
 
         self.layer1 = self._make_layer(block, 64, layers[0], norm_layer=norm_layer)
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2, norm_layer=norm_layer)
+
         self.layer3 = self._make_layer(block, 256, layers[2], stride=strides[0], dilation=dilations[0], norm_layer=norm_layer)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=strides[1], dilation=dilations[1], norm_layer=norm_layer)
 
@@ -107,11 +118,21 @@ class ResNext(nn.Module):
         x = self.bn1(x)
         x = self.relu(x)
         x = self.maxpool(x)
+        
         c1 = self.layer1(x)
         c2 = self.layer2(c1)
         c3 = self.layer3(c2)
         c4 = self.layer4(c3)
+
         return c1, c2, c3, c4
 
-def resnext50_32x4d():
-    return ResNext(Bottleneck, [3, 4, 6, 3], groups=32, width_per_group=4, output_stride=8)
+
+def resnext50_32x4d(norm_layer=nn.BatchNorm2d):
+    return ResNext(Bottleneck, [3, 4, 6, 3], groups=32,
+                   width_per_group=4, norm_layer=norm_layer)
+
+
+def resnext101_32x8d(norm_layer=nn.BatchNorm2d):
+    return ResNext(Bottleneck, [3, 4, 23, 3], groups=32,
+                   width_per_group=8, norm_layer=norm_layer)
+
