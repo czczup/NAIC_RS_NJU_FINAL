@@ -50,14 +50,14 @@ def key_mapping(key):
 if __name__ == '__main__':
     context.set_context(mode=context.GRAPH_MODE, device_target="GPU", save_graphs=False, device_id=0)
     ms_model = Ms_DUNetV2(phase="val", num_classes=[8, 14], aux=False, get_backbone=ms_resnext101, mode="03")
-    save_checkpoint(ms_model, "resnext101_dunet.ckpt")
-    param_dict = load_checkpoint("resnext101_dunet.ckpt")
-    ms_keys = list(param_dict.keys())
+    # save_checkpoint(ms_model, "resnext101_dunet.ckpt")
+    # param_dict = load_checkpoint("resnext101_dunet.ckpt")
+    # ms_keys = list(param_dict.keys())
     
     pt_model = Pt_DUNetV2(nclass=[8, 14], get_backbone=pt_resnext101)
-    # state_dict = torch.load("resnext101_dunet.pth")
-    # pt_model.load_state_dict(state_dict=state_dict, strict=False)
-    state_dict = pt_model.state_dict()
+    state_dict = torch.load("resnext101_dunet.pth")
+    pt_model.load_state_dict(state_dict=state_dict, strict=False)
+    # state_dict = pt_model.state_dict()
     pt_model.eval()
     state_dict = {k: v for k, v in state_dict.items() if "num_batches_tracked" not in k and "aux" not in k}
     pt_keys = list(state_dict.keys())

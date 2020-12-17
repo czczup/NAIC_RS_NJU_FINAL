@@ -22,4 +22,5 @@ python eval.py --data_root="datasets/naicrs/datasetA/trainval"  \
                --data_lst="datasets/naicrs/txt/valA.txt"  \
                --batch_size=32  \
                --backbone=resnext101  \
-               --ckpt_path="runs/checkpoints/resnext101_deeplabv3plus.ckpt"
+               --ckpt_path="runs/checkpoints/resnext101_dunet.ckpt"  \
+               --model=dunetv2
