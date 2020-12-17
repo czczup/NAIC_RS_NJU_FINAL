@@ -9,6 +9,8 @@ import torch
 import time
 from tabulate import tabulate
 import argparse
+import sys
+
 
 def generate_outputs(pyfile_path, input_paths, output_dir, args):
     if args.new:
@@ -22,9 +24,13 @@ def generate_outputs(pyfile_path, input_paths, output_dir, args):
 
     model = init_model(args)
     start_time = time.time()
-    for input_path in tqdm(input_paths):
+    
+    for index, input_path in enumerate(input_paths):
+        if index % 100 == 0:
+            print(index, len(input_paths))
+            sys.stdout.flush()
         predict(model, input_path, output_dir, args)
-    print("using time: %.2fs" %(time.time()-start_time))
+    print("using time: %.2fs" %((time.time()-start_time)))
     
     
 def get_iou_datasetC():
@@ -175,6 +181,7 @@ def get_iou_datasetA_and_other(dataset):
         table.append([cls_name, category_iou[i]])
     print('Category iou: \n {}'.format(tabulate(table, headers, tablefmt='grid', showindex="always",
                                                 numalign='center', stralign='center')))
+    print(sum(category_iou[category_iou!=0])/sum(category_iou!=0))
 
 
 if __name__ == '__main__':

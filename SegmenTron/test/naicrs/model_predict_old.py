@@ -1,8 +1,3 @@
-import nvidia.dali.ops as ops
-import nvidia.dali.types as types
-import nvidia.dali as dali
-from nvidia.dali.pipeline import Pipeline
-from nvidia.dali.plugin.pytorch import feed_ndarray as feed_ndarray
 import torch
 from torchvision import transforms
 import torch.nn.functional as F
@@ -11,46 +6,19 @@ import numpy as np
 import cv2
 import os
 import math
+from multiprocessing import Process, Queue
 
+a0 = 0
+b0 = 0
+result_queue = Queue()
+result_path_queue = Queue()
 
-class ExternalInputIterator(object):
-    def __init__(self):
-        self.image_path = None
-        self.last_image_path = None
+input_path_queue = Queue()
 
-    def __iter__(self):
-        self.i = 0
-        self.n = 1
-        return self
+image_queue = Queue()
+image_path_queue = Queue()
+flag = True
 
-    def __next__(self):
-        if self.i < self.n:
-            image = np.fromfile(self.image_path, dtype=np.uint8)
-            self.last_image_path = self.image_path
-            self.i = 1
-            return ([image],)
-        else:
-            raise StopIteration
-
-    def init(self, image_path):
-        self.image_path = image_path
-        self.i = 0
-
-class ExternalSourcePipeline(Pipeline):
-    def __init__(self, batch_size, eii, num_threads, device_id):
-        super(ExternalSourcePipeline, self).__init__(batch_size,
-                                                     num_threads,
-                                                     device_id,
-                                                     seed=12,
-                                                     prefetch_queue_depth=1)
-        self.source = ops.ExternalSource(source=eii, num_outputs=1)
-        self.decode = ops.ImageDecoder(device="mixed", output_type=types.RGB)
-    
-    def define_graph(self):
-        images = self.source()
-        images = self.decode(images)
-        return images
-    
 class Scale():
     def __init__(self, crop_size, upsample_rate, stride):
         self.crop_size = crop_size
@@ -58,37 +26,86 @@ class Scale():
         self.base_size = int(crop_size * upsample_rate)
         self.stride = stride
 
-batch_size = 8
+
+# TODO:
+threshold_a = 9000 # being 290000
+threshold_b = 9000 # being 20000
+
+batch_size = 16
 device = torch.device("cuda")
 transform = transforms.Compose([
-            transforms.Normalize([0.485, 0.456, 0.406],
-                                 [0.229, 0.224, 0.225]),
-        ])
-eii = ExternalInputIterator()
-pipe = ExternalSourcePipeline(batch_size=1, eii=eii, num_threads=4, device_id=0)
-pipe.build()
+    transforms.Normalize([0.485, 0.456, 0.406],
+                         [0.229, 0.224, 0.225]),
+])
+
+
+def writer():
+    a1 = 0
+    while a1 < threshold_a:
+        # print("writer:", a1)
+        result = result_queue.get()
+        w, h = result.shape
+        filename = result_path_queue.get()
+        cv2.imwrite(filename, result)
+        a1 += (w * h) / (256 * 256)
+
+p_writer = Process(target=writer, args=())
+p_writer.start()
+
+def reader():
+    b1 = 0
+    while b1 < threshold_b:
+        # print("reader:", b1)
+        input_path, result_path = input_path_queue.get()
+        image = Image.open(input_path).convert('RGB')
+        image_queue.put(image)
+        image_path_queue.put(result_path)
+        b1 += 1
+
+p_reader = Process(target=reader, args=())
+p_reader.start()
 
 def predict(model, input_path, output_dir, args):
     filename = os.path.basename(input_path)
     filename, _ = os.path.splitext(filename)
-    if args.dali:
-        eii.init(input_path)
-        image = pipe.run()[0][0]
-        empty = torch.empty(size=image.shape(), device=device, dtype=torch.uint8)
-        stream = torch.cuda.current_stream(device=device)
-        feed_ndarray(image, empty, cuda_stream=stream)
-        empty = empty.permute((2, 0, 1))
-        image = transform(empty / 255.0).unsqueeze(0)
+    result_path = os.path.join(output_dir, filename + ".png")
+    global b0, flag
+    # print("predict:", b0)
+    if b0 < threshold_b:
+        input_path_queue.put((input_path, result_path))
+        b0 += 1
     else:
+        if flag:
+            for i in range(threshold_b):
+                if i % 100 == 0:
+                    print(i, threshold_b)
+                image = image_queue.get()
+                # print("predict: i =", i)
+                result_path = image_path_queue.get()
+                inference(model, image, result_path, args)
+            flag = False
+            
         image = Image.open(input_path).convert('RGB')
-        image = torch.tensor(np.array(image),dtype=torch.uint8).permute(2,0,1).to(device)
-        image = transform(image/255.0)
-        image = torch.unsqueeze(image, dim=0)
-        
-    with torch.no_grad():
-        multi_scale_predict(model, image, filename, output_dir, args)
-        torch.cuda.empty_cache()
+        inference(model, image, result_path, args)
+    
 
+
+def inference(model, image, path, args):
+    image = torch.tensor(np.array(image), dtype=torch.uint8).permute(2, 0, 1).to(device)
+    image = transform(image / 255.0)
+    image = torch.unsqueeze(image, dim=0)
+    global a0
+    with torch.no_grad():
+        predict = multi_scale_predict(model, image, args)
+        if a0 < threshold_a:
+            result_path_queue.put(path)
+            result_queue.put(predict)
+            w, h = predict.shape
+            a0 += (w * h) / (256 * 256)
+        else:
+            p_writer.join()
+            cv2.imwrite(path, predict)
+        torch.cuda.empty_cache()
 
 def single_scale_predict_v1(scale: Scale, image, model):
     width, height = image.size(2), image.size(3)
@@ -135,9 +152,9 @@ def single_scale_predict_v2(scale: Scale, image, model, mode):
     return output
 
 
-def multi_scale_predict(model, image, filename, output_dir, args):
+def multi_scale_predict(model, image, args):
     scale1 = Scale(crop_size=256, upsample_rate=1.0, stride=256 - args.stride)
-    scale2 = Scale(crop_size=320, upsample_rate=1.0 * 0.8, stride=320 - args.stride)
+    # scale2 = Scale(crop_size=320, upsample_rate=1.0 * 0.8, stride=320 - args.stride)
     
     origin_width, origin_height = image.size(2), image.size(3)
     output1 = single_scale_predict_v2(scale1, image, model, mode=args.mode)
@@ -148,7 +165,7 @@ def multi_scale_predict(model, image, filename, output_dir, args):
     output = F.interpolate(output, (origin_width, origin_height), mode='bilinear', align_corners=True)
     
     predict = torch.argmax(output, dim=1).squeeze(0)
-
+    
     if args.mode in ["01", "02", "03"]:
         predict = (predict + 1) * 100
         predict = predict.cpu().data.numpy()
@@ -158,5 +175,4 @@ def multi_scale_predict(model, image, filename, output_dir, args):
         predict[predict >= 4] += 3
         predict = predict.to(torch.uint8).cpu().data.numpy()
         # predict = predict.astype(np.uint8)
-    
-    cv2.imwrite(os.path.join(output_dir, filename + ".png"), predict)
+    return predict

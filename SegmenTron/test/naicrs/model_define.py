@@ -14,6 +14,7 @@ from segmentron.models.backbones.ofa_v100_gpu64_6ms.main import ofa_v100_gpu64_6
 from segmentron.models.backbones.resnet import resnet50
 from segmentron.models.backbones.vovnet import vovnet19_dw
 from deeplabv3plus_nearest import DeepLabV3PlusNearest
+from dunet_nearest import DUNetNearest
 from tools import fuse_module
 try:
     import apex
@@ -23,17 +24,18 @@ except:
 
 def init_model(args):
     device = torch.device("cuda")
-    
+    # torch.multiprocessing.set_start_method('spawn')
     # model = DeepLabV3Plus(nclass=[8,14], get_backbone=ofa_1080ti_gpu64_27ms, channels=[32, 1664])
     # model = DeepLabV3Plus(nclass=[8,14], get_backbone=shufflenetv2_plus, channels=[68,1280])
     # model = DeepLabV3Plus(nclass=[8,14], get_backbone=ibn_resnet50, channels=[256, 2048])
     # model = DeepLabV3Plus(nclass=[8,14], get_backbone=ofa_note10_lat_8ms, channels=[24, 160])
     # model = DeepLabV3Plus(nclass=[8,14], get_backbone=resnext50_32x4d, channels=[256, 2048])
     # model = DeepLabV3Plus(nclass=[8,14], get_backbone=tiny_ofa_1080ti_gpu64_27ms, channels=[32, 416])
-    # model = DeepLabV3Plus(nclass=[8,14], get_backbone=ofa_v100_gpu64_6ms, channels=[32, 248])
+    model = DeepLabV3Plus(nclass=[8,14], get_backbone=ofa_v100_gpu64_6ms, channels=[32, 248])
     # model = DeepLabV3PlusNearest(nclass=[8,14], get_backbone=ofa_v100_gpu64_6ms, channels=[32, 248])
     # model = DeepLabV3Plus(nclass=[8,14], get_backbone=vovnet19_dw, channels=[256, 1024])
-    model = DeepLabV3PlusNearest(nclass=[8,14], get_backbone=resnext101_32x8d, channels=[256, 2048])
+    # model = DeepLabV3PlusNearest(nclass=[8,14], get_backbone=resnext101_32x8d, channels=[256, 2048])
+    # model = DUNetNearest(nclass=[8,14], get_backbone=resnext101_32x8d)
 
     model_path = "../model/%s" % args.model
     print('load test model from {}'.format(model_path))
