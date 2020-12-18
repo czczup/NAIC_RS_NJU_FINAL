@@ -43,7 +43,7 @@ def parse_args():
     parser.add_argument('--data_root', type=str, default='', help='root path of val data')
     parser.add_argument('--data_lst', type=str, default='', help='list of val data')
     parser.add_argument('--batch_size', type=int, default=1, help='batch size')
-    parser.add_argument('--crop_size', type=int, default=256, help='crop size')
+    parser.add_argument('--crop_size', type=int, default=224, help='crop size')
     parser.add_argument('--image_mean', type=list, default=[0.485, 0.456, 0.406], help='image mean')
     parser.add_argument('--image_std', type=list, default=[0.229, 0.224, 0.225], help='image std')
     parser.add_argument('--scales', type=list, default=[1.0], help='scales of evaluation')
@@ -155,15 +155,18 @@ def net_eval():
         img_path = os.path.join(args.data_root, img_path)
         msk_path = os.path.join(args.data_root, msk_path)
         basename = os.path.basename(msk_path)
+        
         img_ = Image.open(img_path)
-        # img_ = img_.resize((args.crop_size, args.crop_size), Image.BILINEAR)
+        img_ = img_.resize((224, 224), Image.BILINEAR)
+        
         msk_ = Image.open(msk_path)
-        # msk_ = msk_.resize((args.crop_size, args.crop_size), Image.NEAREST)
+        msk_ = msk_.resize((224, 224), Image.NEAREST)
+
         img_ = np.array(img_)
         msk_ = np.array(msk_, dtype=np.int32)
         if "datasetA" in msk_path:
             msk_ = msk_ // 100 - 1
-        elif "datasetC" in msk_path:
+        elif "datasetC" in msk_path or "final" in msk_path:
             msk_[msk_==4] = 2
             msk_[msk_>=7] -= 3
             msk_ = msk_- 1

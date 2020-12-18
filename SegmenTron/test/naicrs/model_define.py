@@ -64,3 +64,9 @@ def init_model(args):
         pass
     
     return model
+
+
+if __name__ == '__main__':
+    model = DeepLabV3Plus(nclass=[8,14], get_backbone=ofa_v100_gpu64_6ms, channels=[32, 248])
+    model = fuse_module(model)
+    torch.save(model.state_dict(), "without_bn")

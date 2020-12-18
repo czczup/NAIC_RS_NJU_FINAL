@@ -27,7 +27,7 @@ except:
 
 
 
-def test_model(model):
+def test_model(model, resize=False, mode="03"):
     device = torch.device("cuda")
     try:
         model = apex.amp.initialize(model.cuda(), opt_level="O3")
@@ -37,6 +37,8 @@ def test_model(model):
     model = model.to(device)
 
     image = Image.open("0.tif").convert('RGB')
+    if resize:
+        image = image.resize((224, 224))
     transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406],
@@ -49,12 +51,12 @@ def test_model(model):
     images = torch.cat(images, 0).to(device)
     
     for i in range(500):
-        outs = model(images, mode="03")
+        outs = model(images, mode=mode)
         
     torch.cuda.synchronize()
     time_start = time.time()
     for i in range(1000):
-        outs = model(images, mode="03")
+        outs = model(images, mode=mode)
     torch.cuda.synchronize()
     return (time.time() - time_start) / batch_size
 
@@ -109,28 +111,30 @@ if __name__ == '__main__':
 
     model = DeepLabV3Plus(nclass=[8, 14], get_backbone=ofa_v100_gpu64_6ms, channels=[32, 248])
     model = fuse_module(model)
-    results.append("ofa_v100_gpu64_6ms: %.2fs/%dpics" % (test_model(model), num))
-    print(results[-1])
-    
-    model = DeepLabV3Plus(nclass=[8,14], get_backbone=vovnet19, channels=[256, 1024])
-    model = fuse_module(model)
-    results.append("vovnet19: %.2fs/%dpics" % (test_model(model), num))
+    results.append("ofa_v100_gpu64_6ms: %.2fs/%dpics" % (test_model(model, resize=False, mode="03"), num))
     print(results[-1])
 
-    model = DeepLabV3Plus(nclass=[8,14], get_backbone=vovnet19_dw, channels=[256, 1024])
-    model = fuse_module(model)
-    results.append("vovnet19_dw: %.2fs/%dpics" % (test_model(model), num))
+    results.append("ofa_v100_gpu64_6ms: %.2fs/%dpics" % (test_model(model, resize=True, mode="04"), num))
     print(results[-1])
-
-    model = DeepLabV3Plus(nclass=[8,14], get_backbone=vovnet19_slim, channels=[112, 512])
-    model = fuse_module(model)
-    results.append("vovnet19_slim: %.2fs/%dpics" % (test_model(model), num))
-    print(results[-1])
-    
-    model = DeepLabV3Plus(nclass=[8,14], get_backbone=vovnet19_slim_dw, channels=[112, 512])
-    model = fuse_module(model)
-    results.append("vovnet19_slim_dw: %.2fs/%dpics" % (test_model(model), num))
-    print(results[-1])
+    # model = DeepLabV3Plus(nclass=[8,14], get_backbone=vovnet19, channels=[256, 1024])
+    # model = fuse_module(model)
+    # results.append("vovnet19: %.2fs/%dpics" % (test_model(model), num))
+    # print(results[-1])
+    #
+    # model = DeepLabV3Plus(nclass=[8,14], get_backbone=vovnet19_dw, channels=[256, 1024])
+    # model = fuse_module(model)
+    # results.append("vovnet19_dw: %.2fs/%dpics" % (test_model(model), num))
+    # print(results[-1])
+    #
+    # model = DeepLabV3Plus(nclass=[8,14], get_backbone=vovnet19_slim, channels=[112, 512])
+    # model = fuse_module(model)
+    # results.append("vovnet19_slim: %.2fs/%dpics" % (test_model(model), num))
+    # print(results[-1])
+    #
+    # model = DeepLabV3Plus(nclass=[8,14], get_backbone=vovnet19_slim_dw, channels=[112, 512])
+    # model = fuse_module(model)
+    # results.append("vovnet19_slim_dw: %.2fs/%dpics" % (test_model(model), num))
+    # print(results[-1])
     
     print("*********")
     for result in results:
