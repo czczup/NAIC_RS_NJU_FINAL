@@ -36,11 +36,11 @@ def predict(model, input_path, output_dir, args):
         torch.cuda.empty_cache()
 
 
-def single_scale_predict_v1(scale: Scale, image, model):
+def single_scale_predict_v1(scale: Scale, image, model, mode):
     width, height = image.size(2), image.size(3)
     image = F.interpolate(image, (int(width * scale.upsample_rate), int(height * scale.upsample_rate)),
                           mode='bilinear', align_corners=True)
-    output = model(image)[0]
+    output = model(image, mode)[0]
     return output
 
 
@@ -82,11 +82,11 @@ def single_scale_predict_v2(scale: Scale, image, model, mode):
 
 
 def multi_scale_predict(model, image, filename, output_dir, args):
-    scale1 = Scale(crop_size=256, upsample_rate=0.875, stride=256 - args.stride)
+    scale1 = Scale(crop_size=256, upsample_rate=0.15, stride=256)
     # scale2 = Scale(crop_size=320, upsample_rate=1.0 * 0.8, stride=320 - args.stride)
     
     origin_width, origin_height = image.size(2), image.size(3)
-    output = single_scale_predict_v2(scale1, image, model, mode=args.mode)
+    output = single_scale_predict_v1(scale1, image, model, args.mode)
     output = F.interpolate(output, (origin_width, origin_height), mode='bilinear', align_corners=True)
     
     predict = torch.argmax(output, dim=1).squeeze(0)
