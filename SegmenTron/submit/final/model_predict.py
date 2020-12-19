@@ -24,16 +24,14 @@ class Scale():
 nclass = 14
 batch_size = 32
 scale1 = Scale(crop_size=256, upsample_rate=0.875, stride=256-63)
-# scale2 = Scale(crop_size=320, upsample_rate=1.0*0.8, stride=320-80)
-
 
 def predict(model, input_path, output_dir):
     filename = os.path.basename(input_path)
     filename, _ = os.path.splitext(filename)
     image = Image.open(input_path).convert('RGB')
-    
-    image = transform(image)
-    image = torch.unsqueeze(image, dim=0).to(device)
+    image = torch.tensor(np.array(image), dtype=torch.uint8).permute(2, 0, 1).to(device)
+    image = transform(image / 255.0)
+    image = torch.unsqueeze(image, dim=0)
     
     with torch.no_grad():
         multi_scale_predict(model, image, filename, output_dir)
