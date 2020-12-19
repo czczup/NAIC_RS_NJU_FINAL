@@ -9,13 +9,12 @@ TRAIN:
     BASE_SIZE: 256
     SUPERVISE_SIZE: 256
     BACKBONE_PRETRAINED_PATH: "pretrain/resnext101_32x8d-8ba56ff5.pth"
-    MODEL_PRETRAINED_PATH: "runs/checkpoints/0066_deeplabv3p_resnext101/best_model.pth"
 TEST:
     BATCH_SIZE: 32
     SCALES: [0.75, 1.0, 1.25]
 
 SOLVER:
-    LR: 0.04
+    LR: 0.08
     OPTIMIZER: "SGD"
     USE_FP16: True
     AUX: True

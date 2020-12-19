@@ -17,7 +17,7 @@
 import os
 import argparse
 import mindspore
-from mindspore import context
+from mindspore import context, Tensor, Parameter
 from mindspore.train.model import Model
 from mindspore.context import ParallelMode
 import mindspore.nn as nn
@@ -28,10 +28,11 @@ from mindspore.communication.management import init, get_rank, get_group_size
 from mindspore.train.callback import LossMonitor, TimeMonitor
 from mindspore.train.loss_scale_manager import FixedLossScaleManager
 from mindspore.common import set_seed
-from src.data import datasetC as data_generator
+from src.data import datasetAC as data_generator
 from src.loss import loss
 from src.nets import net_factory
 from src.utils import learning_rates
+import torch
 
 set_seed(1)
 context.set_context(mode=context.GRAPH_MODE, enable_auto_mixed_precision=True, save_graphs=False,
@@ -44,9 +45,9 @@ class BuildTrainNetwork(nn.Cell):
         self.network = network
         self.criterion = criterion
 
-    def construct(self, input_data, label):
-        output = self.network(input_data)
-        net_loss = self.criterion(output, label)
+    def construct(self, input_data, label8, label14):
+        x1, auxout1, x2, auxout2 = self.network(input_data)
+        net_loss = self.criterion(x1, auxout1, x2, auxout2, label8, label14)
         return net_loss
 
 
@@ -71,13 +72,14 @@ def parse_args():
     parser.add_argument('--base_lr', type=float, default=0.015, help='base learning rate')
     parser.add_argument('--lr_decay_step', type=int, default=40000, help='learning rate decay step')
     parser.add_argument('--lr_decay_rate', type=float, default=0.1, help='learning rate decay rate')
-    parser.add_argument('--loss_scale', type=float, default=3072.0, help='loss scale')
+    parser.add_argument('--loss_scale', type=float, default=1.0, help='loss scale')
 
     # model
     parser.add_argument('--model', type=str, default='deeplabv3plus', help='select model')
     parser.add_argument('--freeze_bn', action='store_true', help='freeze bn')
     parser.add_argument('--aux', action='store_true', help='aux')
     parser.add_argument('--ckpt_pre_trained', type=str, default='', help='pretrained model')
+    parser.add_argument('--pth_pretrained', type=str, default='', help='pretrained model')
 
     # train
     parser.add_argument('--is_distributed', action='store_true', help='distributed training')
@@ -104,7 +106,7 @@ def train():
     print(args)
     
     # dataset
-    dataset = data_generator.DatasetC(image_mean=args.image_mean,
+    dataset = data_generator.DatasetAC(image_mean=args.image_mean,
                                       image_std=args.image_std,
                                       data_file=args.data_file,
                                       batch_size=args.batch_size,
@@ -112,31 +114,42 @@ def train():
                                       max_scale=args.max_scale,
                                       min_scale=args.min_scale,
                                       ignore_label=args.ignore_label,
-                                      num_classes=args.num_classes,
                                       num_readers=2,
                                       num_parallel_calls=4,
                                       shard_id=args.rank,
                                       shard_num=args.group_size)
     dataset = dataset.get_dataset(repeat=1)
 
-    # network
-    if args.model == 'deeplabv3plus':
-        network = net_factory.nets_map[args.model]('train', args.num_classes, 8, args.aux)
-        network.set_train(True)
-        # print(network)
-    else:
-        raise NotImplementedError('model [{:s}] not recognized'.format(args.model))
+
+    network = net_factory.nets_map[args.model]('train', [8, 14], 8, args.aux)
+
+    p2m = open("runs/checkpoints/pytorch2mindspore.csv", "r+")
+    p2m = [line.replace("\n", "").split(",") for line in p2m.readlines()]
+    p2m = {item[0]: item[1] for item in p2m}
+
+    
+    network.set_train(True)
 
     # loss
-    loss_ = loss.SoftmaxCrossEntropyLoss(args.num_classes, args.ignore_label, args.aux)
+    loss_ = loss.SoftmaxCrossEntropyLossV2([8, 14], args.ignore_label, args.aux)
     loss_.add_flags_recursive(fp32=True)
     train_net = BuildTrainNetwork(network, loss_)
+
+    # state_dict = torch.load(args.pth_pretrained)
+    # param_dict = dict()
+    # for k, v in state_dict.items():
+    #     print(k, k in p2m)
+    #     if k in p2m:
+    #         parameter = v.cpu().data.numpy()
+    #         parameter = Parameter(Tensor(parameter), name=p2m[k])
+    #         param_dict[p2m[k]] = parameter
+    # load_param_into_net(train_net, param_dict)
 
     # load pretrained model
     if args.ckpt_pre_trained:
         param_dict = load_checkpoint(args.ckpt_pre_trained)
         load_param_into_net(train_net, param_dict)
-    
+
     # optimizer
     iters_per_epoch = dataset.get_dataset_size()
     total_train_steps = iters_per_epoch * args.train_epochs
@@ -150,7 +163,10 @@ def train():
                                                 total_train_steps, staircase=True)
     else:
         raise ValueError('unknown learning rate type')
-    opt = nn.AdamWeightDecay(params=train_net.trainable_params(), learning_rate=lr_iter, weight_decay=0.0001)
+    opt = nn.SGD(params=train_net.trainable_params(), learning_rate=lr_iter,
+                 momentum=0.9, weight_decay=1e-4)
+    # opt = nn.Momentum(params=train_net.trainable_params(), learning_rate=lr_iter, momentum=0.9, weight_decay=0.0001,
+    #                   loss_scale=args.loss_scale)
 
     # loss scale
     manager_loss_scale = FixedLossScaleManager(args.loss_scale, drop_overflow_update=False)
