@@ -1,4 +1,4 @@
-# this v1 heavily based on detectron2
+# this code heavily based on detectron2
 
 import logging
 import numpy as np

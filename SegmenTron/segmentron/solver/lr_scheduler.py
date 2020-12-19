@@ -1,4 +1,4 @@
-# this v1 heavily reference: detectron2
+# this code heavily reference: detectron2
 from __future__ import division
 import math
 import torch

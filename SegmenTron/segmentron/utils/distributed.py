@@ -1,5 +1,5 @@
 """
-v1 is heavily based on https://github.com/facebookresearch/maskrcnn-benchmark
+code is heavily based on https://github.com/facebookresearch/maskrcnn-benchmark
 """
 import math
 import pickle

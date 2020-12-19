@@ -8,12 +8,11 @@ from resnext import resnext50_32x4d
 from torchvision import transforms
 from segmentron.models.backbones.ofa_1080ti_gpu64_27ms.main import ofa_1080ti_gpu64_27ms
 from segmentron.models.backbones.tiny_ofa_1080ti_gpu64_27ms.main import tiny_ofa_1080ti_gpu64_27ms, ibn_tiny_ofa_1080ti_gpu64_27ms
-from segmentron.models.backbones.shufflenetv2p import shufflenetv2_plus
-from segmentron.models.backbones.ibn_shufflenetv2p import ibn_shufflenetv2_plus
+from segmentron.models.backbones.shufflenetv2plus import shufflenetv2_plus
+from segmentron.models.backbones.ibn_shufflenetv2plus import ibn_shufflenetv2_plus
 from segmentron.models.backbones.ofa_note10_lat_8ms.main import ofa_note10_lat_8ms, ibn_ofa_note10_lat_8ms
 from segmentron.models.backbones.ofa_v100_gpu64_6ms.main import ofa_v100_gpu64_6ms, ibn_ofa_v100_gpu64_6ms
 from segmentron.models.backbones.vovnet import vovnet19, vovnet19_dw, vovnet19_slim, vovnet19_slim_dw
-
 from tqdm import tqdm
 from PIL import Image
 import torch
@@ -25,8 +24,6 @@ except:
     print("apex is not installed")
 
 
-
-
 def test_model(model, resize=False, mode="03"):
     device = torch.device("cuda")
     try:
@@ -36,7 +33,7 @@ def test_model(model, resize=False, mode="03"):
     model.eval()
     model = model.to(device)
 
-    image = Image.open("0.tif").convert('RGB')
+    image = Image.open("test.tif").convert('RGB')
     if resize:
         image = image.resize((224, 224))
     transform = transforms.Compose([

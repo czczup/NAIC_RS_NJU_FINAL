@@ -13,11 +13,7 @@ import sys
 
 
 def generate_outputs(pyfile_path, input_paths, output_dir, args):
-    if args.new:
-        predict_py = pyfile_path+"model_predict"
-    else:
-        predict_py = pyfile_path+"model_predict_old"
-    
+    predict_py = pyfile_path+"model_predict"
     define_py = pyfile_path+"model_define"
     init_model = getattr(importlib.import_module(define_py), "init_model")
     predict = getattr(importlib.import_module(predict_py), "predict")
@@ -189,7 +185,6 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', type=str, help='dataset')
     parser.add_argument('--mode', type=str, help='mode')
     parser.add_argument('--model', type=str, help='model')
-    parser.add_argument('--new', action="store_true", help='new')
     parser.add_argument('--stride', default=32, type=int, help='stride')
     parser.add_argument('--dali', action="store_true", help='dali')
     parser.add_argument('--quantize', action="store_true", help='quantize')

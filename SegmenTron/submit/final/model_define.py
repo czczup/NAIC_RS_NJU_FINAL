@@ -432,20 +432,18 @@ class DeepLabV3Plus(nn.Module):
         input = torch.cat(x, dim=1)
         return input
     
-    def forward_8_14_to_14_v2(self, x):
+    def forward_8_14_to_14(self, x):
         c1, _, c3, c4 = self.encoder(x)
-        outputs = list()
         x1 = self.head(c4, c1)  # 8
         x1 = F.softmax(x1, dim=1)
         x1 = self.split(x1)  # 14
         x2 = self.head2(c4, c1)  # 14
         x2 = F.softmax(x2, dim=1)
         x = x1 + x2  # 14
-        outputs.append(x)
-        return tuple(outputs)
+        return x
     
     def forward(self, x):
-        return self.forward_8_14_to_14_v2(x)
+        return self.forward_8_14_to_14(x)
 
 
 class _DeepLabHead(nn.Module):

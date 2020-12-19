@@ -6,26 +6,13 @@ import numpy as np
 import cv2
 import os
 import math
-from multiprocessing import Process, Queue
 
 device = torch.device("cuda")
 transform = transforms.Compose([
-    transforms.ToTensor(),
     transforms.Normalize([0.485, 0.456, 0.406],
                          [0.229, 0.224, 0.225]),
 ])
 
-result_queue = Queue()
-filename_queue = Queue()
-
-def writer():
-    while True:
-        result = result_queue.get()
-        filename = filename_queue.get()
-        cv2.imwrite(filename, result)
-
-p_writer = Process(target=writer,args=())
-p_writer.start()
 
 class Scale():
     def __init__(self, crop_size, upsample_rate, stride):
@@ -35,10 +22,8 @@ class Scale():
         self.stride = stride
 
 nclass = 14
-batch_size = 4
-scale1 = Scale(crop_size=256, upsample_rate=1.0, stride=256-32)
-
-
+batch_size = 32
+scale1 = Scale(crop_size=256, upsample_rate=0.875, stride=256-63)
 # scale2 = Scale(crop_size=320, upsample_rate=1.0*0.8, stride=320-80)
 
 
@@ -78,14 +63,25 @@ def single_scale_predict_v2(scale: Scale, image, model):
     images = images.permute(0, 2, 1).contiguous()
     images = images.view(B, L, channel, scale.crop_size, scale.crop_size).squeeze(dim=0)
     
-    batch_num = images.size(0) // batch_size + 1
+    batch_num = images.size(0) // batch_size
     outputs = []
-    for i in range(batch_num):
-        batch = images[i * batch_size:(i + 1) * batch_size, ...]
-        if batch.size(0) != 0:
+    if batch_num > 0:
+        for i in range(batch_num-1):
+            batch = images[i * batch_size:(i + 1) * batch_size, ...]
             batch = F.interpolate(batch, (scale.base_size, scale.base_size), mode='bilinear', align_corners=True)
-            output = model(batch)[0]
+            output = model(batch)
             outputs.append(output)
+            
+        batch = images[(batch_num-1) * batch_size:, ...]
+        batch = F.interpolate(batch, (scale.base_size, scale.base_size), mode='bilinear', align_corners=True)
+        output = model(batch)
+        outputs.append(output)
+    else:
+        batch = images
+        batch = F.interpolate(batch, (scale.base_size, scale.base_size), mode='bilinear', align_corners=True)
+        output = model(batch)
+        outputs.append(output)
+    
     del images
     
     outputs = torch.cat(outputs, dim=0)
@@ -101,20 +97,12 @@ def single_scale_predict_v2(scale: Scale, image, model):
 
 def multi_scale_predict(model, image, filename, output_dir):
     origin_width, origin_height = image.size(2), image.size(3)
-    output1 = single_scale_predict_v2(scale1, image, model)
-    # output2 = single_scale_predict_v2(scale2, image, model)
-    # output2 = F.interpolate(output2, (output1.size(2), output1.size(3)), mode='bilinear', align_corners=True)
-    # output = output1 + output2
-    output = output1
-    
+    output = single_scale_predict_v2(scale1, image, model)
     output = F.interpolate(output, (origin_width, origin_height), mode='bilinear', align_corners=True)
-    
+
     predict = torch.argmax(output, dim=1).squeeze(0)
-    
     predict += 1
     predict[predict >= 4] += 3
     predict = predict.to(torch.uint8).cpu().data.numpy()
-    # predict = predict.astype(np.uint8)
-    result_queue.put(predict)
-    filename_queue.put(os.path.join(output_dir, filename + ".png"))
-    # cv2.imwrite(os.path.join(output_dir, filename + ".png"), predict)
+    
+    cv2.imwrite(os.path.join(output_dir, filename + ".png"), predict)
