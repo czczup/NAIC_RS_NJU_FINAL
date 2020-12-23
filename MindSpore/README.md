@@ -1,4 +1,4 @@
-# AI+遥感影像赛道-复赛代码
+# AI+遥感影像赛道-决赛代码
 
 ## 简介
 
@@ -8,11 +8,11 @@
 
 - python3.7.5, cuda10.1
 - pytorch1.6, MindSpore1.0.1 (推荐使用docker)
-- opencv, pillow
+- OpenCV, pillow
 
 ## 数据下载
 
-- 下载华为方面提供的5000张测试图像及标签，放置在`datasets/naicrs/final`文件夹中。
+- 下载华为提供的5000张测试图像及标签，放置在`datasets/naicrs/final`文件夹中。
 
 ## 模型迁移
 
@@ -47,7 +47,7 @@
 4. 运行推理脚本，生成的结果保存至`datasets/naicrs/final/results`文件夹中
 
    ```
-   python eval.pth
+   python eval.py
    ```
 
 ## 实验结果
