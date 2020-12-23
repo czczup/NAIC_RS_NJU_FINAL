@@ -1,20 +1,13 @@
 import os
 import sys
-
 cur_path = os.path.abspath(os.path.dirname(__file__))
 root_path = os.path.split(cur_path)[0]
 sys.path.append(root_path)
-
 from mindspore import context
-from mindspore.train.serialization import save_checkpoint, load_param_into_net, load_checkpoint
-from src.nets.backbones.resnext import resnext101_32x8d as ms_resnext101
-from segmentron.models.backbones.resnext import resnext101_32x8d as pt_resnext101
-from src.nets.dunetv2 import DUNetV2 as Ms_DUNetV2
-from src.pytorch.dunet import DUNet as Pt_DUNetV2
+from mindspore.train.serialization import save_checkpoint, load_param_into_net
 from mindspore import Tensor, Parameter
 import mindspore.common.dtype as mstype
 import torch
-import numpy as np
 
 
 def key_mapping(key):
