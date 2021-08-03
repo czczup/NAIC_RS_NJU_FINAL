@@ -18,6 +18,7 @@ datasets = {
     'datasetC_aug': AugDatasetC,
     'datasetAC': DatasetAC,
     'datasetAC_distill': DistillDatasetAC,
+    'GID': DatasetGID
 }
 
 
